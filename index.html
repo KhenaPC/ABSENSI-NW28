@@ -151,6 +151,8 @@ tr.detail td{background:var(--surface-2);font-size:13px}
 .phead>span{width:100%}
 .pbar.open{border:1px solid var(--line);border-radius:12px;padding:12px}
 .pdetail{display:flex;flex-direction:column;gap:14px;margin-top:8px}
+.tiles.in{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.tiles.in .tile:first-child{grid-column:auto}
 .tiles.in .tile{background:var(--surface-2)}
 .tiles.in .tile strong{font-size:20px}
 .pbar .bar i.l{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 4px,transparent 4px 8px)}
@@ -487,7 +489,7 @@ function vGaji(){
       body+=`<tr class="detail"><td colspan="8"><div class="detail-list">${det||'<span class="muted">Hanya kasbon di periode ini.</span>'}</div></td></tr>`;
     }
   }
-  const kas=S.kasbon.filter(k=>k.tgl>=UI.dari&&k.tgl<=UI.sampai).map(k=>{const w=W(k.wid);return `<div class="blok"><b>${esc(w?w.nama:'?')}</b><span class="muted small">${tglPendek(k.tgl)}</span><span class="grow small">${esc(k.ket||'')}</span><span class="num"><b>${rp(k.jumlah)}</b></span>${ed('k|'+k.id)}<button class="x" data-act="del-kas" data-id="${k.id}" aria-label="Hapus kasbon">×</button></div>`}).join('');
+  const kas=S.kasbon.filter(k=>k.tgl>=UI.dari&&k.tgl<=UI.sampai).map(k=>{const w=W(k.wid);return `<div class="blok"><b>${esc(w?w.nama:'?')}</b><span class="muted small">${tglPendek(k.tgl)}</span><select id="k${k.id}p" data-k="kas" data-id="${k.id}" data-f="pid" aria-label="Proyek kasbon"><option value="0">Tanpa proyek</option>${opsiProyek(k.pid||0)}</select><span class="grow small">${esc(k.ket||'')}</span><span class="num"><b>${rp(k.jumlah)}</b></span>${ed('k|'+k.id)}<button class="x" data-act="del-kas" data-id="${k.id}" aria-label="Hapus kasbon">×</button></div>`}).join('');
   return `${periodeBar('Rekap gaji')}
   <section class="panel">
     ${rows.length?`<div class="tbl"><table>
@@ -504,6 +506,7 @@ function vGaji(){
     ${kas||'<span class="muted small">Tidak ada kasbon di periode ini.</span>'}
     <div class="row">
       <select id="kb-w" aria-label="Pekerja">${opsiPekerja(0)}</select>
+      <select id="kb-p" aria-label="Proyek kasbon"><option value="0">Tanpa proyek</option>${opsiProyek(0)}</select>
       <input type="date" id="kb-t" value="${UI.sampai}" aria-label="Tanggal kasbon">
       <input type="number" id="kb-j" min="0" step="10000" inputmode="numeric" placeholder="Jumlah (Rp)" aria-label="Jumlah kasbon">
       <input type="text" id="kb-k" class="grow" placeholder="Keterangan" aria-label="Keterangan">
@@ -518,8 +521,14 @@ function vProyek(){
   for(const d of rk)for(const x of d.h.rows){if(x.err)continue;const o=by[x.s.pid]=by[x.s.pid]||{hari:0,lem:0,bN:0,bL:0,det:[]};o.hari+=x.bobot;o.lem+=x.lem;o.bN+=x.bN;o.bL+=x.bL;o.det.push({tgl:d.tgl,w:d.w,x,dobel:d.h.dobel})}
   const kum={};
   for(const d of rekap('0000-00-00',UI.sampai))for(const x of d.h.rows){if(x.err)continue;const o=kum[x.s.pid]=kum[x.s.pid]||{tot:0,awal:d.tgl};o.tot+=x.bN+x.bL}
-  const list=S.projects.filter(p=>by[p.id]).map(p=>({p,...by[p.id]})).sort((a,b)=>(b.bN+b.bL)-(a.bN+a.bL));
-  const mx=Math.max(1,...list.map(o=>o.bN+o.bL)),tot=list.reduce((t,o)=>t+o.bN+o.bL,0);
+  const kb={},kbK={};
+  for(const k of S.kasbon){
+    if(!k.pid||k.tgl>UI.sampai)continue;
+    kbK[k.pid]=(kbK[k.pid]||0)+k.jumlah;
+    if(k.tgl>=UI.dari){const o=kb[k.pid]=kb[k.pid]||{tot:0,list:[]};o.tot+=k.jumlah;o.list.push(k)}
+  }
+  const list=S.projects.filter(p=>by[p.id]||kb[p.id]).map(p=>({p,hari:0,lem:0,bN:0,bL:0,det:[],...by[p.id],kas:kb[p.id]?kb[p.id].tot:0,kl:kb[p.id]?kb[p.id].list:[]})).sort((a,b)=>(b.bN+b.bL-b.kas)-(a.bN+a.bL-a.kas));
+  const mx=Math.max(1,...list.map(o=>o.bN+o.bL)),tot=list.reduce((t,o)=>t+o.bN+o.bL,0),totK=list.reduce((t,o)=>t+o.kas,0);
   const detail=o=>{
     const k=kum[o.p.id]||{tot:0,awal:UI.dari},per={};
     for(const d of o.det){const a=per[d.w.id]=per[d.w.id]||{w:d.w,hari:0,lem:0,b:0};a.hari+=d.x.bobot;a.lem+=d.x.lem;a.b+=d.x.bN+d.x.bL}
@@ -536,20 +545,22 @@ function vProyek(){
       <div class="tiles in">
         <div class="tile"><span class="label">Bobot upah normal</span><strong>${rp(o.bN)}</strong><span class="small muted num">${num(o.hari)} hari-orang</span></div>
         <div class="tile t-ot"><span class="label">Bobot lembur</span><strong>${rp(o.bL)}</strong><span class="small muted num">${num(o.lem/60)} jam lembur</span></div>
-        <div class="tile t-br"><span class="label">Total beban upah s.d. ${tglPendek(UI.sampai)}</span><strong>${rp(k.tot)}</strong><span class="small muted">dihitung sejak absensi pertama proyek ini, ${tglPendek(k.awal)}</span></div>
+        <div class="tile"><span class="label">Kasbon proyek ini</span><strong>${o.kas?'−'+rp(o.kas):'–'}</strong><span class="small muted num">${o.kl.length} kasbon di periode ini</span></div>
+        <div class="tile t-br"><span class="label">Nilai proyek s.d. ${tglPendek(UI.sampai)}</span><strong>${rp(k.tot-(kbK[o.p.id]||0))}</strong><span class="small muted">sejak absensi pertama proyek ini, ${tglPendek(k.awal)}${kbK[o.p.id]?`. Upah ${rp(k.tot)} dikurangi kasbon ${rp(kbK[o.p.id])}`:''}</span></div>
       </div>
       <div><div class="label" style="margin-bottom:6px">Pekerja di proyek ini (${tglPendek(UI.dari)} – ${tglPendek(UI.sampai)})</div><div class="row">${orang}</div></div>
       <div class="tbl"><table>
         <thead><tr><th>Tanggal</th><th>Pekerja</th><th>Jam kerja</th><th class="r">Bobot hari</th><th class="r">Upah normal</th><th class="r">Jam lembur</th><th class="r">Upah lembur</th><th class="r">Jumlah</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="3">Total periode ini</td><td class="r">${num(o.hari)}</td><td class="r">${rp(o.bN)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bL)}</td><td class="r">${rp(o.bN+o.bL)}</td></tr></tfoot>
+        <tfoot><tr><td colspan="3">Total periode ini</td><td class="r">${num(o.hari)}</td><td class="r">${rp(o.bN)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bL)}</td><td class="r">${rp(o.bN+o.bL)}</td></tr>${o.kas?`<tr><td colspan="7">Kasbon proyek ini</td><td class="r">−${rp(o.kas)}</td></tr><tr><td colspan="7">Nilai proyek periode ini</td><td class="r">${rp(o.bN+o.bL-o.kas)}</td></tr>`:''}</tfoot>
       </table></div>
+      ${o.kl.length?`<div><div class="label" style="margin-bottom:6px">Kasbon yang dibebankan ke proyek ini</div><div class="detail-list small">${o.kl.map(k=>`<div><b>${tglPendek(k.tgl)}</b><span>${esc((W(k.wid)||{}).nama||'?')}</span><span class="muted">${esc(k.ket||'')}</span><span class="num">−${rp(k.jumlah)}</span></div>`).join('')}</div></div>`:''}
     </div>`};
   const bars=list.map(o=>{const open=UI.bukaP.has(o.p.id);return `<div class="pbar${open?' open':''}">
       <button class="phead" data-act="buka-p" data-id="${o.p.id}" aria-expanded="${open}">
-        <span class="row"><i class="dot" style="background:${o.p.warna}"></i><b class="grow">${esc(o.p.nama)} <span class="muted small">${open?'▾ tutup rincian':'▸ lihat rincian'}</span></b><span class="big num">${rp(o.bN+o.bL)}</span></span>
+        <span class="row"><i class="dot" style="background:${o.p.warna}"></i><b class="grow">${esc(o.p.nama)} <span class="muted small">${open?'▾ tutup rincian':'▸ lihat rincian'}</span></b><span class="big num">${rp(o.bN+o.bL-o.kas)}</span></span>
         <span class="bar"><i style="width:${o.bN/mx*100}%;background:${o.p.warna}"></i><i class="l" style="width:${o.bL/mx*100}%;background-color:${o.p.warna}"></i></span>
-        <span class="small muted num">${num(o.hari)} hari-orang · ${rp(o.bN)} normal &nbsp;|&nbsp; ${num(o.lem/60)} jam lembur · ${rp(o.bL)}</span>
+        <span class="small muted num">${num(o.hari)} hari-orang · ${rp(o.bN)} normal &nbsp;|&nbsp; ${num(o.lem/60)} jam lembur · ${rp(o.bL)}${o.kas?` &nbsp;|&nbsp; kasbon −${rp(o.kas)}`:''}</span>
       </button>
       ${open?detail(o):''}
     </div>`}).join('');
@@ -561,7 +572,7 @@ function vProyek(){
     </div>`).join('');
   return `${periodeBar('Biaya tenaga kerja per proyek')}
   <section class="panel kartu">
-    ${list.length?`${bars}<div class="row small muted"><span class="grow">Klik proyek untuk melihat rincian. Batang polos = jam normal, batang bergaris = lembur.</span><span>Total semua proyek <b class="num" style="color:var(--ink)">${rp(tot)}</b>, sama dengan total upah pekerja sebelum kasbon.</span></div>`:'<p class="muted">Belum ada absensi di periode ini.</p>'}
+    ${list.length?`${bars}<div class="row small muted"><span class="grow">Klik proyek untuk melihat rincian. Batang polos = jam normal, batang bergaris = lembur.</span><span class="num">Upah ${rp(tot)}${totK?` − kasbon proyek ${rp(totK)}`:''} = nilai semua proyek <b style="color:var(--ink)">${rp(tot-totK)}</b></span></div>`:'<p class="muted">Belum ada absensi di periode ini.</p>'}
   </section>
   <section class="panel kartu">
     <h3>Daftar proyek</h3>
@@ -621,6 +632,7 @@ function vAturan(){
       <li>Tarif lembur bisa diganti khusus untuk satu blok lewat kolom tarif yang muncul di blok lembur.</li>
       <li>Tim Garut memakai jam normal sendiri (07:00–17:00), setelah itu lembur dengan potongan istirahat 18:00–19:00.</li>
       <li>Event: upah dihitung per argo 24 jam sejak jam berangkat, masuk ke proyek yang dipilih dan dicatat di tanggal berangkat.</li>
+      <li>Kasbon selalu memotong upah pekerja. Kalau kasbon diberi proyek, nilai proyek itu ikut berkurang di periode yang memuat tanggal kasbonnya.</li>
       <li>Tim Garut: begitu ada blok yang selesai di jam batas atau lebih, hari itu dibayar 2× upah harian. Tambahan 1 hari dibagi ke proyek sesuai jam lemburnya.</li>
     </ul>
   </section>
@@ -695,7 +707,7 @@ document.addEventListener('click',e=>{
     case 'add-kas':{
       const wid=+document.getElementById('kb-w').value,j=+document.getElementById('kb-j').value,tg=document.getElementById('kb-t').value;
       if(!wid||!tg||!(j>0)){toast('Isi pekerja, tanggal, dan jumlah kasbon');return}
-      const kid=nid();stamp('k|'+kid,'Kasbon '+W(wid).nama);S.kasbon.push({id:kid,tgl:tg,wid,jumlah:j,ket:document.getElementById('kb-k').value.trim()});break}
+      const kid=nid();stamp('k|'+kid,'Kasbon '+W(wid).nama);S.kasbon.push({id:kid,tgl:tg,wid,pid:+document.getElementById('kb-p').value||null,jumlah:j,ket:document.getElementById('kb-k').value.trim()});break}
     case 'del-kas':catat('Menghapus kasbon');S.kasbon=S.kasbon.filter(k=>k.id!==id);break;
     case 'salin-rekap':{
       const L=[['Pekerja','Tipe','Hari','Jam lembur','Upah normal','Upah lembur','Kasbon','Diterima'].join('\t')];
@@ -708,7 +720,7 @@ document.addEventListener('click',e=>{
       const n=document.getElementById('np-n').value.trim();if(!n){toast('Isi nama proyek');return}
       const pid=nid();stamp('p|'+pid,'Proyek '+n);S.projects.push({id:pid,nama:n,warna:WARNA[S.projects.length%WARNA.length],aktif:true});break}
     case 'del-proj':
-      if(S.segs.some(s=>s.pid===id)){toast('Proyek ini sudah punya absensi. Nonaktifkan saja supaya datanya aman.');return}
+      if(S.segs.some(s=>s.pid===id)||S.kasbon.some(k=>k.pid===id)){toast('Proyek ini sudah punya absensi atau kasbon. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus proyek');S.projects=S.projects.filter(p=>p.id!==id);break;
     case 'add-w':{
       const n=document.getElementById('nw-n').value.trim(),u=+document.getElementById('nw-u').value,l=+document.getElementById('nw-l').value;
@@ -734,6 +746,7 @@ document.addEventListener('change',e=>{
   else if(k==='r'){const r=S.rules[t.dataset.tipe];stamp('r|'+t.dataset.tipe,'Aturan '+TIPE[t.dataset.tipe]);
     if(f==='ist')r.ist[+t.dataset.i][+t.dataset.j]=+v;else if(f==='dobel')r.dobel=v;else if(f==='ganti')r.ganti=v==='1';else r[f]=+v;
     if(r.selesai<=r.mulai)toast('Jam selesai normal harus setelah jam mulai')}
+  else if(k==='kas'){const x=S.kasbon.find(q=>q.id===id);if(!x)return;x.pid=+v||null;stamp('k|'+id,'Kasbon '+((W(x.wid)||{}).nama||''))}
   else if(k==='ui'){if(!v)return;UI[f]=v;if(f==='tgl')UI.pilih.clear();if(UI.dari>UI.sampai){if(f==='dari')UI.sampai=v;else UI.dari=v}render();return}
   else if(k==='pilih'){v?UI.pilih.add(id):UI.pilih.delete(id);render();return}
   else if(k==='semua'){UI.pilih.clear();if(v){const sh=S.segs.filter(s=>s.tgl===UI.tgl);for(const w of S.workers)if(w.aktif||sh.some(s=>s.wid===w.id))UI.pilih.add(w.id)}render();return}
