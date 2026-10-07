@@ -172,6 +172,17 @@ td .edited{display:block;margin-top:4px}
 .login{max-width:380px;width:100%;margin:40px auto;display:flex;flex-direction:column;gap:12px}
 .login label{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:13px}
 .login input{width:100%}
+.det-wrap{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+td.ck,th.ck{width:34px;padding-right:0}
+.slip-host{position:fixed;left:-10000px;top:0}
+/* slip PDF: selalu memakai palet terang supaya terbaca saat dicetak */
+.slip{--surface:#FFFFFF;--surface-2:#F4F6FC;--ink:#161B3A;--muted:#5E6788;--line:#D7DDED;--brand:#2B3FD6;--brand-soft:#E2E7FF;--ot:#D9530B;--ot-soft:#FFE9DB;--ok:#0B8A5F;--ok-soft:#DBF5EA;--bad:#CF2745;--bad-soft:#FDE3E8;--ev:#7A3FD0;--ev-soft:#EFE5FF;
+  width:794px;padding:32px;background:#FFFFFF;color:var(--ink);font-family:var(--f-body);font-size:14px;display:flex;flex-direction:column;gap:18px}
+.slip table{min-width:0}
+.slip-head{display:flex;align-items:center;gap:20px;padding-bottom:16px;border-bottom:3px solid var(--brand)}
+.slip-head img{height:78px;width:auto}
+.slip-head h2{font-size:26px}
+.slip .detail-list{background:var(--surface-2);border-radius:10px;padding:12px 14px;gap:5px}
 #toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:20;max-width:calc(100% - 32px);text-align:center}
 @media (prefers-reduced-motion:no-preference){.blk{transition:left .2s,width .2s}}
 </style>
@@ -352,7 +363,7 @@ async function tarik(paksa){
 }
 setInterval(()=>{if(document.visibilityState==='visible')tarik(false)},20000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')tarik(false)});
-const UI={user:'',sync:'',basi:false,sibuk:false,loginErr:'',loginU:'',tab:'absensi',tgl:HARI_INI,dari:addD(HARI_INI,-6),sampai:HARI_INI,pilih:new Set(),buka:new Set(),bukaP:new Set(),bulk:{pid:0,a:480,b:720},reset:false,salin:''};
+const UI={user:'',sync:'',basi:false,sibuk:false,loginErr:'',loginU:'',tab:'absensi',tgl:HARI_INI,dari:addD(HARI_INI,-6),sampai:HARI_INI,pilih:new Set(),buka:new Set(),bukaP:new Set(),slip:new Set(),pdf:false,bulk:{pid:0,a:480,b:720},reset:false,salin:''};
 
 const jamEdit=at=>new Date(at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 function catat(apa){S.log=S.log.filter(l=>!(l.by===UI.user&&l.apa===apa));S.log.unshift({by:UI.user,at:Date.now(),apa});if(S.log.length>50)S.log.length=50}
@@ -496,28 +507,82 @@ function dataGaji(){
   for(const k of S.kasbon){if(k.tgl<UI.dari||k.tgl>UI.sampai)continue;const w=W(k.wid);if(w)get(w).kas+=k.jumlah}
   return Object.values(by).sort((a,b)=>a.w.nama.localeCompare(b.w.nama));
 }
+function rincian(o){
+  return o.days.map(d=>`<div><b>${tglPendek(d.tgl)}</b>${d.h.dobel?'<span class="pill ot">2× upah</span>':''}<span class="num">${rp(d.h.total)}</span></div>`+d.h.rows.filter(x=>!x.err).map(x=>{const p=P(x.s.pid);return `<div class="muted"><span class="num">${jamTxt(x)}</span><span><i class="dot" style="background:${p?p.warna:'var(--muted)'}"></i> ${esc(p?p.nama:'?')}</span><span class="num">${x.bobot?num(x.bobot)+' hari ':''}${x.lem?num(x.lem/60)+' jam lembur ':''}· ${rp(x.bN+x.bL)}</span></div>`}).join('')).join('');
+}
+let LOGO='';
+function logoURL(){
+  if(LOGO)return LOGO;
+  const e=document.createElement('i');e.className='lg-full';e.style.cssText='position:fixed;left:-9999px';document.body.appendChild(e);
+  const cs=getComputedStyle(e),m=/url\(["']?(data:[^"')]+)["']?\)/.exec(cs.webkitMaskImage||cs.maskImage||'');e.remove();
+  return LOGO=m?m[1]:'';
+}
+function slipHTML(o){
+  const kas=S.kasbon.filter(k=>k.wid===o.w.id&&k.tgl>=UI.dari&&k.tgl<=UI.sampai).sort((a,b)=>a.tgl<b.tgl?-1:1);
+  const lg=logoURL();
+  return `<div class="slip">
+    <div class="slip-head">${lg?`<img src="${lg}" alt="">`:''}<div><div class="label">Slip upah</div><h2>${esc(o.w.nama)}</h2><div class="small muted"><span class="pill ${PC[o.w.tipe]}">${TIPE[o.w.tipe]}</span> &nbsp;Periode ${tglPanjang(UI.dari)} – ${tglPanjang(UI.sampai)}</div></div></div>
+    <table>
+      <thead><tr><th class="r">Hari</th><th class="r">Jam lembur</th><th class="r">Upah normal</th><th class="r">Upah lembur</th><th class="r">Kasbon</th><th class="r">Diterima</th></tr></thead>
+      <tbody><tr><td class="r">${num(o.hari)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bN)}</td><td class="r">${rp(o.bL)}</td><td class="r">${o.kas?'−'+rp(o.kas):'–'}</td><td class="r big" style="font-size:18px">${rp(o.bN+o.bL-o.kas)}</td></tr></tbody>
+    </table>
+    <div><div class="label" style="margin-bottom:6px">Rincian per hari</div><div class="detail-list">${rincian(o)||'<span class="muted">Tidak ada absensi di periode ini.</span>'}</div></div>
+    ${kas.length?`<div><div class="label" style="margin-bottom:6px">Kasbon</div><div class="detail-list">${kas.map(k=>{const p=P(k.pid);return `<div><b>${tglPendek(k.tgl)}</b><span>${esc(k.ket||'Kasbon')}</span>${p?`<span class="muted"><i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}</span>`:''}<span class="num">−${rp(k.jumlah)}</span></div>`}).join('')}</div></div>`:''}
+    <div class="small muted">Dibuat ${jamEdit(Date.now())} oleh ${esc(UI.user)} · NW28 Absensi · Natawira Dwi Ashta</div>
+  </div>`;
+}
+function muatSkrip(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error(src));document.head.appendChild(s)})}
+async function unduhPDF(ids){
+  if(UI.pdf)return;
+  const rows=dataGaji().filter(o=>ids.includes(o.w.id));
+  if(!rows.length){toast('Centang dulu pekerja yang mau diunduh');return}
+  UI.pdf=true;toast('Menyiapkan PDF…');
+  let host;
+  try{
+    if(!window.html2canvas)await muatSkrip('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    if(!window.jspdf)await muatSkrip('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+    host=document.createElement('div');host.className='slip-host';document.body.appendChild(host);
+    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'}),PW=210,PH=297,M=8,w=PW-2*M;let first=true;
+    for(const o of rows){
+      host.innerHTML=slipHTML(o);
+      const im=host.querySelector('img');if(im&&!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
+      const cv=await window.html2canvas(host.firstElementChild,{scale:2,backgroundColor:'#ffffff'});
+      const k=cv.width/w,pageH=Math.floor((PH-2*M)*k);
+      for(let y=0;y<cv.height;y+=pageH){
+        const hh=Math.min(pageH,cv.height-y),c=document.createElement('canvas');c.width=cv.width;c.height=hh;
+        c.getContext('2d').drawImage(cv,0,y,cv.width,hh,0,0,cv.width,hh);
+        if(!first)pdf.addPage();first=false;
+        pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',M,M,w,hh/k);
+      }
+    }
+    const slug=s=>s.trim().replace(/[^A-Za-z0-9]+/g,'-');
+    pdf.save(`Slip-${rows.length===1?slug(rows[0].w.nama):rows.length+'-pekerja'}_${UI.dari}_${UI.sampai}.pdf`);
+    toast(rows.length===1?'PDF slip diunduh':`PDF berisi ${rows.length} slip diunduh`);
+  }catch(e){toast('PDF gagal dibuat. Periksa internet lalu coba lagi.')}
+  if(host)host.remove();UI.pdf=false;
+}
 function vGaji(){
   const rows=dataGaji(),T={hari:0,lem:0,bN:0,bL:0,kas:0};
   let body='';
   for(const o of rows){
     for(const k in T)T[k]+=o[k];
     const open=UI.buka.has(o.w.id);
-    body+=`<tr class="klik" data-act="buka" data-id="${o.w.id}"><td><b>${esc(o.w.nama)}</b> <span class="muted small">${open?'▾':'▸'}</span></td><td><span class="pill ${PC[o.w.tipe]}">${TIPE[o.w.tipe]}</span></td>
+    body+=`<tr class="klik" data-act="buka" data-id="${o.w.id}"><td class="ck"><input type="checkbox" id="sl${o.w.id}" data-k="slip" data-id="${o.w.id}"${UI.slip.has(o.w.id)?' checked':''} aria-label="Pilih ${esc(o.w.nama)} untuk PDF"></td><td><b>${esc(o.w.nama)}</b> <span class="muted small">${open?'▾':'▸'}</span></td><td><span class="pill ${PC[o.w.tipe]}">${TIPE[o.w.tipe]}</span></td>
       <td class="r">${num(o.hari)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bN)}</td><td class="r">${rp(o.bL)}</td><td class="r">${o.kas?'−'+rp(o.kas):'–'}</td><td class="r big">${rp(o.bN+o.bL-o.kas)}</td></tr>`;
     if(open){
-      const det=o.days.map(d=>`<div><b>${tglPendek(d.tgl)}</b>${d.h.dobel?'<span class="pill ot">2× upah</span>':''}<span class="num">${rp(d.h.total)}</span></div>`+d.h.rows.filter(x=>!x.err).map(x=>{const p=P(x.s.pid);return `<div class="muted"><span class="num">${jamTxt(x)}</span><span><i class="dot" style="background:${p?p.warna:'var(--muted)'}"></i> ${esc(p?p.nama:'?')}</span><span class="num">${x.bobot?num(x.bobot)+' hari ':''}${x.lem?num(x.lem/60)+' jam lembur ':''}· ${rp(x.bN+x.bL)}</span></div>`}).join('')).join('');
-      body+=`<tr class="detail"><td colspan="8"><div class="detail-list">${det||'<span class="muted">Hanya kasbon di periode ini.</span>'}</div></td></tr>`;
+      body+=`<tr class="detail"><td colspan="9"><div class="det-wrap"><div class="detail-list grow">${rincian(o)||'<span class="muted">Hanya kasbon di periode ini.</span>'}</div><button class="btn pri" data-act="pdf" data-id="${o.w.id}">Unduh PDF slip</button></div></td></tr>`;
     }
   }
   const kas=S.kasbon.filter(k=>k.tgl>=UI.dari&&k.tgl<=UI.sampai).map(k=>{const w=W(k.wid);return `<div class="blok"><b>${esc(w?w.nama:'?')}</b><span class="muted small">${tglPendek(k.tgl)}</span><select id="k${k.id}p" data-k="kas" data-id="${k.id}" data-f="pid" aria-label="Proyek kasbon"><option value="0">Tanpa proyek</option>${opsiProyek(k.pid||0)}</select><span class="grow small">${esc(k.ket||'')}</span><span class="num"><b>${rp(k.jumlah)}</b></span>${ed('k|'+k.id)}<button class="x" data-act="del-kas" data-id="${k.id}" aria-label="Hapus kasbon">×</button></div>`}).join('');
   return `${periodeBar('Rekap gaji')}
   <section class="panel">
     ${rows.length?`<div class="tbl"><table>
-      <thead><tr><th>Pekerja</th><th>Tipe</th><th class="r">Hari</th><th class="r">Jam lembur</th><th class="r">Upah normal</th><th class="r">Upah lembur</th><th class="r">Kasbon</th><th class="r">Diterima</th></tr></thead>
+      <thead><tr><th class="ck"><input type="checkbox" id="sl-semua" data-k="slip-semua"${rows.every(o=>UI.slip.has(o.w.id))?' checked':''} aria-label="Pilih semua untuk PDF"></th><th>Pekerja</th><th>Tipe</th><th class="r">Hari</th><th class="r">Jam lembur</th><th class="r">Upah normal</th><th class="r">Upah lembur</th><th class="r">Kasbon</th><th class="r">Diterima</th></tr></thead>
       <tbody>${body}</tbody>
-      <tfoot><tr><td colspan="2">Total</td><td class="r">${num(T.hari)}</td><td class="r">${num(T.lem/60)}</td><td class="r">${rp(T.bN)}</td><td class="r">${rp(T.bL)}</td><td class="r">${T.kas?'−'+rp(T.kas):'–'}</td><td class="r big">${rp(T.bN+T.bL-T.kas)}</td></tr></tfoot>
+      <tfoot><tr><td colspan="3">Total</td><td class="r">${num(T.hari)}</td><td class="r">${num(T.lem/60)}</td><td class="r">${rp(T.bN)}</td><td class="r">${rp(T.bL)}</td><td class="r">${T.kas?'−'+rp(T.kas):'–'}</td><td class="r big">${rp(T.bN+T.bL-T.kas)}</td></tr></tfoot>
     </table></div>
-    <div class="row" style="margin-top:12px"><span class="muted small grow">Klik nama pekerja untuk melihat rincian per hari.</span><button class="btn" data-act="salin-rekap">Salin rekap (untuk Excel / WhatsApp)</button></div>
+    <div class="row" style="margin-top:12px"><span class="muted small grow">Klik nama pekerja untuk melihat rincian per hari. Centang beberapa pekerja untuk mengunduh slipnya dalam satu PDF.</span><button class="btn pri" data-act="pdf-pilih">Unduh PDF (${rows.filter(o=>UI.slip.has(o.w.id)).length} terpilih)</button><button class="btn" data-act="salin-rekap">Salin rekap (untuk Excel / WhatsApp)</button></div>
     ${UI.salin?`<p class="small muted">Salin otomatis tidak diizinkan di sini. Pilih teks di bawah lalu salin manual.</p><textarea id="salin-box" readonly>${esc(UI.salin)}</textarea>`:''}`
     :'<p class="muted">Belum ada absensi di periode ini.</p>'}
   </section>
@@ -694,9 +759,12 @@ function blokBaru(w,tgl){
 }
 
 document.addEventListener('click',e=>{
+  if(e.target.closest('input,select,textarea'))return;
   const t=e.target.closest('[data-act]');if(!t)return;
   const act=t.dataset.act,id=+t.dataset.id;
   switch(act){
+    case 'pdf':unduhPDF([id]);return;
+    case 'pdf-pilih':unduhPDF([...UI.slip]);return;
     case 'keluar':keluar();return;
     case 'tab':UI.tab=t.dataset.tab;UI.reset=false;UI.salin='';render();window.scrollTo(0,0);return;
     case 'tgl':UI.tgl=addD(UI.tgl,+t.dataset.n);UI.pilih.clear();render();return;
@@ -769,6 +837,8 @@ document.addEventListener('change',e=>{
     if(r.selesai<=r.mulai)toast('Jam selesai normal harus setelah jam mulai')}
   else if(k==='kas'){const x=S.kasbon.find(q=>q.id===id);if(!x)return;x.pid=+v||null;stamp('k|'+id,'Kasbon '+((W(x.wid)||{}).nama||''))}
   else if(k==='ui'){if(!v)return;UI[f]=v;if(f==='tgl')UI.pilih.clear();if(UI.dari>UI.sampai){if(f==='dari')UI.sampai=v;else UI.dari=v}render();return}
+  else if(k==='slip'){v?UI.slip.add(id):UI.slip.delete(id);render();return}
+  else if(k==='slip-semua'){UI.slip.clear();if(v)for(const o of dataGaji())UI.slip.add(o.w.id);render();return}
   else if(k==='pilih'){v?UI.pilih.add(id):UI.pilih.delete(id);render();return}
   else if(k==='semua'){UI.pilih.clear();if(v){const sh=S.segs.filter(s=>s.tgl===UI.tgl);for(const w of S.workers)if(w.aktif||sh.some(s=>s.wid===w.id))UI.pilih.add(w.id)}render();return}
   else if(k==='bulk'){UI.bulk[f]=+v;render();return}
