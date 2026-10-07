@@ -16,7 +16,7 @@ Aplikasi absensi dan upah harian per proyek untuk NW28 (Natawira Dwi Ashta).
 ## Aturan upah
 
 - Workshop NW28: jam normal 08:00–16:00 (istirahat 12:00–13:00), lembur flat per jam, istirahat lembur 18:00–19:00.
-- Tim Garut: jam normal 07:00–17:00, lembur per jam, upah jadi 2x upah harian bila kerja sampai 23:00.
+- Tim Garut: jam normal 07:00–17:00, lembur per jam. Upah jadi 2x upah harian bila masuk 07:00 dan keluar 23:00; kalau masuk mundur, jam keluar wajib mundur sama banyak (masuk 08:00 berarti keluar 24:00).
 - Event: upah per argo 24 jam sejak jam berangkat.
 
 Semua aturan bisa diubah di tab Aturan.

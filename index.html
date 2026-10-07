@@ -227,10 +227,17 @@ function hitung(w,list){
     x.bL=x.lem/60*x.tarif;
   }
   const lem=rows.reduce((t,x)=>t+x.lem,0);
-  const dobel=!!r.dobel&&lem>0&&okd.some(s=>s.b>=r.dobelJam);
-  if(dobel)for(const x of rows){if(x.err)continue;const bonus=w.upah*x.lem/lem;x.bL=r.ganti?bonus:x.bL+bonus}
-  const hari=rows.reduce((t,x)=>t+x.bobot,0),bN=rows.reduce((t,x)=>t+x.bN,0),bL=rows.reduce((t,x)=>t+x.bL,0);
-  return {rows,dobel,hari,lem,bN,bL,total:bN+bL};
+  const hari=rows.reduce((t,x)=>t+x.bobot,0);
+  // 2x upah: jam keluar wajib mundur sebanyak jam masuk mundur dari jam normal (masuk 07 -> 23, masuk 08 -> 24)
+  const masuk=okd.reduce((m,s)=>Math.min(m,s.a),1e9),keluar=okd.reduce((m,s)=>Math.max(m,s.b),0);
+  const syarat=r.dobel&&okd.length?masuk+(r.dobelJam-r.mulai):null;
+  const dobel=syarat!=null&&lem>0&&keluar>=syarat;
+  if(dobel){
+    const pool=r.ganti?Math.max(0,2-hari)*w.upah:w.upah;
+    for(const x of rows){if(x.err)continue;const bonus=pool*x.lem/lem;x.bL=r.ganti?bonus:x.bL+bonus}
+  }
+  const bN=rows.reduce((t,x)=>t+x.bN,0),bL=rows.reduce((t,x)=>t+x.bL,0);
+  return {rows,dobel,syarat,hari,lem,bN,bL,total:bN+bL};
 }
 //</calc>
 
@@ -420,7 +427,7 @@ function kartu(w,h){
       <h3>${esc(w.nama)}</h3>
       <span class="pill ${PC[w.tipe]}">${TIPE[w.tipe]}</span>
       <span class="muted small num">${ev?`${rp(w.upah)} per argo (24 jam)`:`${rp(w.upah)}/hari · lembur ${rp(w.lembur)}/jam`}</span>
-      <div class="k-total">${h.dobel?'<span class="pill ot">2× upah harian</span> ':''}${hadir?`<strong>${rp(h.total)}</strong><div class="muted small num">${num(h.hari)} ${ev?'argo':'hari'}${h.lem?` + ${num(h.lem/60)} jam lembur`:''}</div>`:'<span class="pill off">Belum diisi</span>'}</div>
+      <div class="k-total">${h.dobel?'<span class="pill ot">2× upah harian</span> ':''}${hadir?`<strong>${rp(h.total)}</strong><div class="muted small num">${num(h.hari)} ${ev?'argo':'hari'}${h.lem?` + ${num(h.lem/60)} jam lembur`:''}${h.syarat!=null&&!h.dobel?` · 2× upah bila keluar ${h.syarat<=1440?hm(h.syarat):'lewat 24:00'}`:''}</div>`:'<span class="pill off">Belum diisi</span>'}</div>
     </div>
     <div><div class="tl" role="img" aria-label="Garis waktu ${esc(w.nama)}">${tl}</div><div class="ticks" aria-hidden="true">${ticks}</div></div>
     ${bawa}${bloks}
@@ -617,7 +624,7 @@ function vAturan(){
     <h3><span class="pill ${PC[tp]}">${TIPE[tp]}</span></h3>
     <div class="field"><span>Jam kerja normal</span><span class="row"><select id="r${tp}m" ${d} data-f="mulai" aria-label="Mulai">${opsiJam(r.mulai)}</select>–<select id="r${tp}s" ${d} data-f="selesai" aria-label="Selesai">${opsiJam(r.selesai)}</select></span></div>
     ${r.ist.map((x,i)=>`<div class="field"><span>Istirahat ${i+1}</span><span class="row"><select id="r${tp}i${i}a" ${d} data-f="ist" data-i="${i}" data-j="0" aria-label="Mulai istirahat">${opsiJam(x[0])}</select>–<select id="r${tp}i${i}b" ${d} data-f="ist" data-i="${i}" data-j="1" aria-label="Selesai istirahat">${opsiJam(x[1])}</select></span></div>`).join('')}
-    <div class="field"><label class="row" for="r${tp}d"><input type="checkbox" id="r${tp}d" ${d} data-f="dobel"${r.dobel?' checked':''}> Upah jadi 2× saat kerja sampai jam</label><select id="r${tp}j" ${d} data-f="dobelJam" aria-label="Jam batas 2×">${opsiJam(r.dobelJam)}</select></div>
+    <div class="field"><label class="row" for="r${tp}d"><input type="checkbox" id="r${tp}d" ${d} data-f="dobel"${r.dobel?' checked':''}> Upah jadi 2× bila masuk di jam normal dan keluar jam</label><select id="r${tp}j" ${d} data-f="dobelJam" aria-label="Jam batas 2×">${opsiJam(r.dobelJam)}</select></div>
     ${r.dobel?`<div class="field"><span>Saat kena 2×, jam lembur malam itu</span><select id="r${tp}g" ${d} data-f="ganti" aria-label="Cara hitung 2×"><option value="1"${r.ganti?' selected':''}>diganti 1 hari upah (total 2 hari)</option><option value="0"${r.ganti?'':' selected'}>tetap dibayar + 1 hari upah</option></select></div>`:''}
     ${ed('r|'+tp)}
   </section>`};
@@ -633,7 +640,7 @@ function vAturan(){
       <li>Tim Garut memakai jam normal sendiri (07:00–17:00), setelah itu lembur dengan potongan istirahat 18:00–19:00.</li>
       <li>Event: upah dihitung per argo 24 jam sejak jam berangkat, masuk ke proyek yang dipilih dan dicatat di tanggal berangkat.</li>
       <li>Kasbon selalu memotong upah pekerja. Kalau kasbon diberi proyek, nilai proyek itu ikut berkurang di periode yang memuat tanggal kasbonnya.</li>
-      <li>Tim Garut: begitu ada blok yang selesai di jam batas atau lebih, hari itu dibayar 2× upah harian. Tambahan 1 hari dibagi ke proyek sesuai jam lemburnya.</li>
+      <li>Tim Garut dapat 2× upah harian bila masuk 07:00 dan keluar 23:00. Kalau masuknya mundur, jam keluarnya wajib mundur sama banyak (masuk 08:00 berarti keluar 24:00). Kalau syarat itu tidak terpenuhi, lemburnya dihitung per jam biasa.</li>
     </ul>
   </section>
   <section class="panel kartu"><h3>Riwayat edit</h3>${S.log.length?`<div class="detail-list small">${S.log.slice(0,20).map(l=>`<div><b>${esc(l.by)}</b><span>${esc(l.apa)}</span><span class="muted num">${jamEdit(l.at)}</span></div>`).join('')}</div>`:'<span class="muted small">Belum ada perubahan.</span>'}</section>
