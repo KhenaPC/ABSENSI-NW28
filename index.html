@@ -234,14 +234,26 @@ function hitung(w,list){
   const dobel=syarat!=null&&lem>0&&keluar>=syarat;
   if(dobel){
     const pool=r.ganti?Math.max(0,2-hari)*w.upah:w.upah;
-    for(const x of rows){if(x.err)continue;const bonus=pool*x.lem/lem;x.bL=r.ganti?bonus:x.bL+bonus}
+    // jam kerja setelah syarat 2x terpenuhi tetap dibayar lembur per jam, di atas 2x upah
+    for(const x of rows){
+      x.lemA=0;if(x.err||!r.ganti)continue;
+      const s=x.s,f=Math.max(s.a,syarat);if(s.b<=f)continue;
+      let m=s.b-f;for(const [p,q] of r.ist)m-=ov(f,s.b,p,q);for(const [p,q] of ss)m-=ov(f,s.b,p,q);
+      x.lemA=Math.max(0,m);
+    }
+    const lemB=rows.reduce((t,x)=>t+(x.err?0:x.lem-x.lemA),0);
+    for(const x of rows){
+      if(x.err)continue;
+      if(!r.ganti){x.bL+=pool*x.lem/lem;continue}
+      x.bL=(lemB>0?pool*(x.lem-x.lemA)/lemB:pool*x.lem/lem)+x.lemA/60*x.tarif;
+    }
   }
   const bN=rows.reduce((t,x)=>t+x.bN,0),bL=rows.reduce((t,x)=>t+x.bL,0);
   return {rows,dobel,syarat,hari,lem,bN,bL,total:bN+bL};
 }
 //</calc>
 
-const KEY='nw28-absensi-v1', T0=360, T1=1440;
+const KEY='nw28-absensi-v1', T0=360, T1=1440, TMAX=1920; // blok kerja boleh sampai 08:00 hari berikutnya
 const TIPE={workshop:'Workshop NW28',garut:'Tim Garut',event:'Event'}, PC={workshop:'ws',garut:'gr',event:'ev'};
 const ARGO=()=>({mode:'argo',mulai:0,selesai:1440,ist:[]});
 const opsiTipe=v=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('');
@@ -250,14 +262,14 @@ const WARNA=['#2F6BFF','#12A594','#E0338B','#E5A800','#8B5CF6','#FF7A1A','#3FAE3
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rp=n=>'Rp'+Math.round(n).toLocaleString('id-ID');
 const num=(n,d=2)=>(Math.round(n*10**d)/10**d).toLocaleString('id-ID');
-const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const hm=m=>{const x=m>1440?m-1440:m;return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')+(m>1440?' (besok)':'')};
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const addD=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return iso(d)};
 const tglPanjang=s=>new Date(s+'T12:00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 const tglPendek=s=>new Date(s+'T12:00:00').toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short'});
 const HARI_INI=iso(new Date());
 const W=id=>S.workers.find(w=>w.id===id), P=id=>S.projects.find(p=>p.id===id);
-const px=m=>Math.max(0,Math.min(100,(m-T0)/(T1-T0)*100));
+
 
 function seed(){
   const t=HARI_INI,y=addD(t,-1);let n=10;
@@ -357,8 +369,8 @@ function vLogin(){return `<section class="panel login"><i class="lg-full" role="
 let toastT;
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2800)}
 
-function opsiJam(v){
-  let o='';const list=[];for(let m=0;m<=1440;m+=30)list.push(m);
+function opsiJam(v,max=1440){
+  let o='';const list=[];for(let m=0;m<=max;m+=30)list.push(m);
   if(!list.includes(v)){list.push(v);list.sort((a,b)=>a-b)}
   for(const m of list)o+=`<option value="${m}"${m===v?' selected':''}>${hm(m)}</option>`;
   return o;
@@ -390,6 +402,7 @@ function hasilBlok(x,dobel){
 function kartu(w,h){
   const r=S.rules[w.tipe];
   const ev=r.mode==='argo';
+  const t1=h.rows.some(x=>x.s.b>T1||x.s.a>T1)?TMAX:T1,px=m=>Math.max(0,Math.min(100,(m-T0)/(t1-T0)*100));
   let tl=ev?'':`<i class="z-ot" style="left:${px(r.selesai)}%;right:0"></i>`,bawa='';
   if(ev)for(const s of S.segs){
     if(s.wid!==w.id||s.tgl>=UI.tgl)continue;
@@ -401,7 +414,7 @@ function kartu(w,h){
   for(const x of h.rows){const p=P(x.s.pid);tl+=`<i class="blk${x.err?' err':''}" style="left:${px(x.s.a)}%;width:${Math.max(0,px(ev?1440:x.s.b)-px(x.s.a))}%;background:${p?p.warna:'var(--muted)'}" title="${esc(p?p.nama:'')} ${hm(x.s.a)}–${hm(x.s.b)}"></i>`}
   for(const [a,b] of r.ist)tl+=`<i class="ist" style="left:${px(a)}%;width:${px(b)-px(a)}%"></i>`;
   if(!ev)tl+=`<i class="mark" style="left:${px(r.selesai)}%"></i>`;
-  let ticks='';for(let m=T0;m<=T1;m+=120)ticks+=`<span class="${m===T0?'first':m===T1?'last':''}" style="left:${px(m)}%">${String(m/60).padStart(2,'0')}</span>`;
+  let ticks='';for(let m=T0;m<=t1;m+=120)ticks+=`<span class="${m===T0?'first':m===t1?'last':''}" style="left:${px(m)}%">${String(m>1440?m/60-24:m/60).padStart(2,'0')}${m>1440?'⁺':''}</span>`;
   const bloks=h.rows.map(x=>{const s=x.s,p=P(s.pid);if(ev)return `
     <div class="blok${x.err?' err':''}">
       <span class="dot" style="background:${p?p.warna:'var(--muted)'}"></span>
@@ -415,7 +428,7 @@ function kartu(w,h){
     <div class="blok${x.err?' err':''}">
       <span class="dot" style="background:${p?p.warna:'var(--muted)'}"></span>
       <select class="proj" id="s${s.id}p" data-k="seg" data-id="${s.id}" data-f="pid" aria-label="Proyek">${opsiProyek(s.pid)}</select>
-      <span class="jam"><select id="s${s.id}a" data-k="seg" data-id="${s.id}" data-f="a" aria-label="Jam mulai">${opsiJam(s.a)}</select><span class="muted">–</span><select id="s${s.id}b" data-k="seg" data-id="${s.id}" data-f="b" aria-label="Jam selesai">${opsiJam(s.b)}</select></span>
+      <span class="jam"><select id="s${s.id}a" data-k="seg" data-id="${s.id}" data-f="a" aria-label="Jam mulai">${opsiJam(s.a,TMAX)}</select><span class="muted">–</span><select id="s${s.id}b" data-k="seg" data-id="${s.id}" data-f="b" aria-label="Jam selesai">${opsiJam(s.b,TMAX)}</select></span>
       <span class="hasil">${hasilBlok(x,h.dobel)}</span>
       ${x.lem>0&&!(h.dobel&&r.ganti)?`<label class="tarif">Tarif lembur/jam <input type="number" min="0" step="500" inputmode="numeric" id="s${s.id}t" data-k="seg" data-id="${s.id}" data-f="tarif" placeholder="${w.lembur}" value="${s.tarif!=null?s.tarif:''}"></label>`:''}
       <button class="x" data-act="del-seg" data-id="${s.id}" aria-label="Hapus blok">×</button>
@@ -427,7 +440,7 @@ function kartu(w,h){
       <h3>${esc(w.nama)}</h3>
       <span class="pill ${PC[w.tipe]}">${TIPE[w.tipe]}</span>
       <span class="muted small num">${ev?`${rp(w.upah)} per argo (24 jam)`:`${rp(w.upah)}/hari · lembur ${rp(w.lembur)}/jam`}</span>
-      <div class="k-total">${h.dobel?'<span class="pill ot">2× upah harian</span> ':''}${hadir?`<strong>${rp(h.total)}</strong><div class="muted small num">${num(h.hari)} ${ev?'argo':'hari'}${h.lem?` + ${num(h.lem/60)} jam lembur`:''}${h.syarat!=null&&!h.dobel?` · 2× upah bila keluar ${h.syarat<=1440?hm(h.syarat):'lewat 24:00'}`:''}</div>`:'<span class="pill off">Belum diisi</span>'}</div>
+      <div class="k-total">${h.dobel?'<span class="pill ot">2× upah harian</span> ':''}${hadir?`<strong>${rp(h.total)}</strong><div class="muted small num">${num(h.hari)} ${ev?'argo':'hari'}${h.lem?` + ${num(h.lem/60)} jam lembur`:''}${h.syarat!=null&&!h.dobel?` · 2× upah bila keluar ${h.syarat<=TMAX?hm(h.syarat):'lewat 08:00 besok'}`:''}</div>`:'<span class="pill off">Belum diisi</span>'}</div>
     </div>
     <div><div class="tl" role="img" aria-label="Garis waktu ${esc(w.nama)}">${tl}</div><div class="ticks" aria-hidden="true">${ticks}</div></div>
     ${bawa}${bloks}
@@ -462,7 +475,7 @@ function vAbsensi(){
     <label class="row small"><input type="checkbox" id="semua" data-k="semua"${ws.length&&ws.every(w=>UI.pilih.has(w.id))?' checked':''}> Pilih semua</label>
     <span class="small muted">Isi cepat:</span>
     <select id="bk-p" data-k="bulk" data-f="pid" aria-label="Proyek isi cepat">${opsiProyek(UI.bulk.pid)}</select>
-    <span class="row"><select id="bk-a" data-k="bulk" data-f="a" aria-label="Mulai">${opsiJam(UI.bulk.a)}</select><span class="muted">–</span><select id="bk-b" data-k="bulk" data-f="b" aria-label="Selesai">${opsiJam(UI.bulk.b)}</select></span>
+    <span class="row"><select id="bk-a" data-k="bulk" data-f="a" aria-label="Mulai">${opsiJam(UI.bulk.a,TMAX)}</select><span class="muted">–</span><select id="bk-b" data-k="bulk" data-f="b" aria-label="Selesai">${opsiJam(UI.bulk.b,TMAX)}</select></span>
     <button class="btn pri" data-act="bulk">Tambahkan ke ${UI.pilih.size||0} pekerja terpilih</button>
     <button class="btn" data-act="salin-kemarin">Salin dari hari sebelumnya</button>
   </div>
@@ -636,11 +649,12 @@ function vAturan(){
       <li>Jam kerja normal dibagi jadi sesi oleh jam istirahat. Dengan 08:00–16:00 dan istirahat 12:00–13:00, ada dua sesi dan masing-masing bernilai <b>0,5 hari</b>.</li>
       <li>Kalau pekerja pindah proyek di tengah sesi, nilai sesi dibagi sesuai jamnya. Biaya normal = bobot hari × upah harian.</li>
       <li>Semua jam di luar jam normal adalah <b>lembur</b>, dipotong jam istirahat. Biaya lembur = jam lembur × tarif lembur per jam pekerja itu, dan masuk ke proyek yang dipilih di blok tersebut.</li>
+      <li>Kerja lewat tengah malam diisi di tanggal mulainya: pilih jam selesai bertanda "(besok)", sampai 08:00. Semua jamnya dihitung sebagai lembur hari itu.</li>
       <li>Tarif lembur bisa diganti khusus untuk satu blok lewat kolom tarif yang muncul di blok lembur.</li>
       <li>Tim Garut memakai jam normal sendiri (07:00–17:00), setelah itu lembur dengan potongan istirahat 18:00–19:00.</li>
       <li>Event: upah dihitung per argo 24 jam sejak jam berangkat, masuk ke proyek yang dipilih dan dicatat di tanggal berangkat.</li>
       <li>Kasbon selalu memotong upah pekerja. Kalau kasbon diberi proyek, nilai proyek itu ikut berkurang di periode yang memuat tanggal kasbonnya.</li>
-      <li>Tim Garut dapat 2× upah harian bila masuk 07:00 dan keluar 23:00. Kalau masuknya mundur, jam keluarnya wajib mundur sama banyak (masuk 08:00 berarti keluar 24:00). Kalau syarat itu tidak terpenuhi, lemburnya dihitung per jam biasa.</li>
+      <li>Tim Garut dapat 2× upah harian bila masuk 07:00 dan keluar 23:00. Kalau masuknya mundur, jam keluarnya wajib mundur sama banyak (masuk 08:00 berarti keluar 24:00). Kalau syarat itu tidak terpenuhi, lemburnya dihitung per jam biasa. Jam kerja setelah syarat terpenuhi dibayar lembur per jam, di atas 2× upah.</li>
     </ul>
   </section>
   <section class="panel kartu"><h3>Riwayat edit</h3>${S.log.length?`<div class="detail-list small">${S.log.slice(0,20).map(l=>`<div><b>${esc(l.by)}</b><span>${esc(l.apa)}</span><span class="muted num">${jamEdit(l.at)}</span></div>`).join('')}</div>`:'<span class="muted small">Belum ada perubahan.</span>'}</section>
@@ -674,8 +688,8 @@ function blokBaru(w,tgl){
   const next=sesi(r).find(([p,q])=>q>e);
   if(!mine.length&&next){[a,b]=next}
   else if(next){a=Math.max(e,next[0]);b=next[1]}
-  else{a=Math.max(e,r.selesai);b=a<1320?1320:Math.min(a+60,1440)}
-  if(a>=1440){toast('Hari ini sudah penuh sampai 24:00');return null}
+  else{a=Math.max(e,r.selesai);b=a<1320?1320:Math.min(a+60,TMAX)}
+  if(a>=TMAX){toast('Blok hari ini sudah penuh sampai 08:00 besok');return null}
   return {id:nid(),tgl,wid:w.id,pid,a,b,tarif:null};
 }
 
