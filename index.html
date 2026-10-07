@@ -179,6 +179,17 @@ td.ck,th.ck{width:34px;padding-right:0}
 .slip{--surface:#FFFFFF;--surface-2:#F4F6FC;--ink:#161B3A;--muted:#5E6788;--line:#D7DDED;--brand:#2B3FD6;--brand-soft:#E2E7FF;--ot:#D9530B;--ot-soft:#FFE9DB;--ok:#0B8A5F;--ok-soft:#DBF5EA;--bad:#CF2745;--bad-soft:#FDE3E8;--ev:#7A3FD0;--ev-soft:#EFE5FF;
   width:794px;padding:32px;background:#FFFFFF;color:var(--ink);font-family:var(--f-body);font-size:14px;display:flex;flex-direction:column;gap:18px}
 .slip table{min-width:0}
+.slip .bar i.l{background-image:none;opacity:.5}
+.slip th,.slip td{padding:7px 8px}
+.slip .tbl{overflow:visible}
+.slip.lap{width:960px}
+.slip .pdetail table{font-size:12px}
+.slip .pdetail th{font-size:9.5px;letter-spacing:.04em}
+.slip .pdetail td,.slip .pdetail th{padding:6px 5px;white-space:nowrap}
+.slip .pdetail .pill{font-size:10px;padding:2px 7px}
+.prow{display:flex;gap:12px;align-items:flex-start}
+.prow input{margin-top:5px;flex:none}
+.prow .phead{flex:1;min-width:0;width:auto}
 .slip-head{display:flex;align-items:center;gap:20px;padding-bottom:16px;border-bottom:3px solid var(--brand)}
 .slip-head img{height:78px;width:auto}
 .slip-head h2{font-size:26px}
@@ -363,7 +374,7 @@ async function tarik(paksa){
 }
 setInterval(()=>{if(document.visibilityState==='visible')tarik(false)},20000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')tarik(false)});
-const UI={user:'',sync:'',basi:false,sibuk:false,loginErr:'',loginU:'',tab:'absensi',tgl:HARI_INI,dari:addD(HARI_INI,-6),sampai:HARI_INI,pilih:new Set(),buka:new Set(),bukaP:new Set(),slip:new Set(),pdf:false,bulk:{pid:0,a:480,b:720},reset:false,salin:''};
+const UI={user:'',sync:'',basi:false,sibuk:false,loginErr:'',loginU:'',tab:'absensi',tgl:HARI_INI,dari:addD(HARI_INI,-6),sampai:HARI_INI,pilih:new Set(),buka:new Set(),bukaP:new Set(),slip:new Set(),prj:new Set(),pdf:false,bulk:{pid:0,a:480,b:720},reset:false,salin:''};
 
 const jamEdit=at=>new Date(at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 function catat(apa){S.log=S.log.filter(l=>!(l.by===UI.user&&l.apa===apa));S.log.unshift({by:UI.user,at:Date.now(),apa});if(S.log.length>50)S.log.length=50}
@@ -532,10 +543,8 @@ function slipHTML(o){
   </div>`;
 }
 function muatSkrip(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error(src));document.head.appendChild(s)})}
-async function unduhPDF(ids){
+async function buatPDF(htmls,nama,pesan){
   if(UI.pdf)return;
-  const rows=dataGaji().filter(o=>ids.includes(o.w.id));
-  if(!rows.length){toast('Centang dulu pekerja yang mau diunduh');return}
   UI.pdf=true;toast('Menyiapkan PDF…');
   let host;
   try{
@@ -543,24 +552,50 @@ async function unduhPDF(ids){
     if(!window.jspdf)await muatSkrip('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;
     host=document.createElement('div');host.className='slip-host';document.body.appendChild(host);
-    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'}),PW=210,PH=297,M=8,w=PW-2*M;let first=true;
-    for(const o of rows){
-      host.innerHTML=slipHTML(o);
-      const im=host.querySelector('img');if(im&&!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
-      const cv=await window.html2canvas(host.firstElementChild,{scale:2,backgroundColor:'#ffffff'});
+    const SC=2,pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'}),PW=210,PH=297,M=8,w=PW-2*M;let first=true;
+    for(const html of htmls){
+      host.innerHTML=html;
+      const el=host.firstElementChild,im=host.querySelector('img');if(im&&!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
+      // titik potong halaman yang aman: batas bawah tiap baris, supaya teks tidak terbelah
+      const top=el.getBoundingClientRect().top,cut=[...el.querySelectorAll('tr,.detail-list>div,.slip>*,.pdetail>*')].map(x=>Math.round((x.getBoundingClientRect().bottom-top)*SC)).sort((a,b)=>a-b);
+      const cv=await window.html2canvas(el,{scale:SC,backgroundColor:'#ffffff'});
       const k=cv.width/w,pageH=Math.floor((PH-2*M)*k);
-      for(let y=0;y<cv.height;y+=pageH){
-        const hh=Math.min(pageH,cv.height-y),c=document.createElement('canvas');c.width=cv.width;c.height=hh;
-        c.getContext('2d').drawImage(cv,0,y,cv.width,hh,0,0,cv.width,hh);
+      for(let y=0;y<cv.height;){
+        let end=y+pageH;
+        if(end>=cv.height)end=cv.height;else{const c=cut.filter(v=>v<=end&&v>y+pageH*0.4).pop();if(c)end=c}
+        const hh=end-y,c=document.createElement('canvas');c.width=cv.width;c.height=hh;
+        const g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,c.width,hh);g.drawImage(cv,0,y,cv.width,hh,0,0,cv.width,hh);
         if(!first)pdf.addPage();first=false;
         pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',M,M,w,hh/k);
+        y=end;
       }
     }
-    const slug=s=>s.trim().replace(/[^A-Za-z0-9]+/g,'-');
-    pdf.save(`Slip-${rows.length===1?slug(rows[0].w.nama):rows.length+'-pekerja'}_${UI.dari}_${UI.sampai}.pdf`);
-    toast(rows.length===1?'PDF slip diunduh':`PDF berisi ${rows.length} slip diunduh`);
+    pdf.save(nama);toast(pesan);
   }catch(e){toast('PDF gagal dibuat. Periksa internet lalu coba lagi.')}
   if(host)host.remove();UI.pdf=false;
+}
+const slug=s=>s.trim().replace(/[^A-Za-z0-9]+/g,'-');
+function unduhPDF(ids){
+  const rows=dataGaji().filter(o=>ids.includes(o.w.id));
+  if(!rows.length){toast('Centang dulu pekerja yang mau diunduh');return}
+  buatPDF(rows.map(slipHTML),`Slip-${rows.length===1?slug(rows[0].w.nama):rows.length+'-pekerja'}_${UI.dari}_${UI.sampai}.pdf`,rows.length===1?'PDF slip diunduh':`PDF berisi ${rows.length} slip diunduh`);
+}
+let PRJ={list:[],detail:()=>''};
+function lapHTML(o){
+  const lg=logoURL(),t=o.bN+o.bL||1;
+  return `<div class="slip lap">
+    <div class="slip-head">${lg?`<img src="${lg}" alt="">`:''}<div><div class="label">Biaya tenaga kerja proyek</div><h2>${esc(o.p.nama)}</h2><div class="small muted">Periode ${tglPanjang(UI.dari)} – ${tglPanjang(UI.sampai)}</div></div>
+      <div style="margin-left:auto;text-align:right"><div class="label">Nilai proyek periode ini</div><div class="big num" style="font-size:24px">${rp(o.bN+o.bL-o.kas)}</div></div></div>
+    <div class="pbar"><span class="bar"><i style="width:${o.bN/t*100}%;background:${o.p.warna}"></i><i class="l" style="width:${o.bL/t*100}%;background-color:${o.p.warna}"></i></span>
+      <span class="small muted num">${num(o.hari)} hari-orang · ${rp(o.bN)} normal &nbsp;|&nbsp; ${num(o.lem/60)} jam lembur · ${rp(o.bL)}${o.kas?` &nbsp;|&nbsp; kasbon −${rp(o.kas)}`:''}</span></div>
+    ${PRJ.detail(o,true)}
+    <div class="small muted">Dibuat ${jamEdit(Date.now())} oleh ${esc(UI.user)} · NW28 Absensi · Natawira Dwi Ashta</div>
+  </div>`;
+}
+function unduhProyek(ids){
+  const L=PRJ.list.filter(o=>ids.includes(o.p.id));
+  if(!L.length){toast('Centang dulu proyek yang mau diunduh');return}
+  buatPDF(L.map(lapHTML),`Proyek-${L.length===1?slug(L[0].p.nama):L.length+'-proyek'}_${UI.dari}_${UI.sampai}.pdf`,L.length===1?'PDF proyek diunduh':`PDF berisi ${L.length} proyek diunduh`);
 }
 function vGaji(){
   const rows=dataGaji(),T={hari:0,lem:0,bN:0,bL:0,kas:0};
@@ -614,7 +649,7 @@ function vProyek(){
   }
   const list=S.projects.filter(p=>by[p.id]||kb[p.id]).map(p=>({p,hari:0,lem:0,bN:0,bL:0,det:[],...by[p.id],kas:kb[p.id]?kb[p.id].tot:0,kl:kb[p.id]?kb[p.id].list:[]})).sort((a,b)=>(b.bN+b.bL-b.kas)-(a.bN+a.bL-a.kas));
   const mx=Math.max(1,...list.map(o=>o.bN+o.bL)),tot=list.reduce((t,o)=>t+o.bN+o.bL,0),totK=list.reduce((t,o)=>t+o.kas,0);
-  const detail=o=>{
+  const detail=(o,pdf)=>{
     const k=kum[o.p.id]||{tot:0,awal:UI.dari},per={};
     for(const d of o.det){const a=per[d.w.id]=per[d.w.id]||{w:d.w,hari:0,lem:0,b:0};a.hari+=d.x.bobot;a.lem+=d.x.lem;a.b+=d.x.bN+d.x.bL}
     const det=[...o.det].sort((a,b)=>a.tgl<b.tgl?-1:a.tgl>b.tgl?1:a.w.nama.localeCompare(b.w.nama)||a.x.s.a-b.x.s.a);
@@ -627,6 +662,7 @@ function vProyek(){
       <td class="r"><b>${rp(x.bN+x.bL)}</b></td></tr>`}).join('');
     const orang=Object.values(per).sort((a,b)=>a.w.nama.localeCompare(b.w.nama)).map(a=>`<span class="pill nm num">${esc(a.w.nama)} · ${a.hari?num(a.hari)+' hari':''}${a.hari&&a.lem?' + ':''}${a.lem?num(a.lem/60)+' jam lembur':''} · ${rp(a.b)}</span>`).join('');
     return `<div class="pdetail">
+      ${pdf?'':`<div class="row"><span class="grow small muted">PDF mengikuti periode yang sedang dipilih.</span><button class="btn pri" data-act="pdf-p" data-id="${o.p.id}">Unduh PDF proyek</button></div>`}
       <div class="tiles in">
         <div class="tile"><span class="label">Bobot upah normal</span><strong>${rp(o.bN)}</strong><span class="small muted num">${num(o.hari)} hari-orang</span></div>
         <div class="tile t-ot"><span class="label">Bobot lembur</span><strong>${rp(o.bL)}</strong><span class="small muted num">${num(o.lem/60)} jam lembur</span></div>
@@ -642,13 +678,15 @@ function vProyek(){
       ${o.kl.length?`<div><div class="label" style="margin-bottom:6px">Kasbon yang dibebankan ke proyek ini</div><div class="detail-list small">${o.kl.map(k=>`<div><b>${tglPendek(k.tgl)}</b><span>${esc((W(k.wid)||{}).nama||'?')}</span><span class="muted">${esc(k.ket||'')}</span><span class="num">−${rp(k.jumlah)}</span></div>`).join('')}</div></div>`:''}
     </div>`};
   const bars=list.map(o=>{const open=UI.bukaP.has(o.p.id);return `<div class="pbar${open?' open':''}">
+      <div class="prow"><input type="checkbox" id="pj${o.p.id}" data-k="prj" data-id="${o.p.id}"${UI.prj.has(o.p.id)?' checked':''} aria-label="Pilih ${esc(o.p.nama)} untuk PDF">
       <button class="phead" data-act="buka-p" data-id="${o.p.id}" aria-expanded="${open}">
         <span class="row"><i class="dot" style="background:${o.p.warna}"></i><b class="grow">${esc(o.p.nama)} <span class="muted small">${open?'▾ tutup rincian':'▸ lihat rincian'}</span></b><span class="big num">${rp(o.bN+o.bL-o.kas)}</span></span>
         <span class="bar"><i style="width:${o.bN/mx*100}%;background:${o.p.warna}"></i><i class="l" style="width:${o.bL/mx*100}%;background-color:${o.p.warna}"></i></span>
         <span class="small muted num">${num(o.hari)} hari-orang · ${rp(o.bN)} normal &nbsp;|&nbsp; ${num(o.lem/60)} jam lembur · ${rp(o.bL)}${o.kas?` &nbsp;|&nbsp; kasbon −${rp(o.kas)}`:''}</span>
-      </button>
+      </button></div>
       ${open?detail(o):''}
     </div>`}).join('');
+  PRJ={list,detail};
   const master=S.projects.map(p=>`<div class="blok">
       <input type="color" id="p${p.id}c" data-k="p" data-id="${p.id}" data-f="warna" value="${p.warna}" aria-label="Warna proyek">
       <input type="text" id="p${p.id}n" class="grow" data-k="p" data-id="${p.id}" data-f="nama" value="${esc(p.nama)}" aria-label="Nama proyek">
@@ -657,7 +695,7 @@ function vProyek(){
     </div>`).join('');
   return `${periodeBar('Biaya tenaga kerja per proyek')}
   <section class="panel kartu">
-    ${list.length?`${bars}<div class="row small muted"><span class="grow">Klik proyek untuk melihat rincian. Batang polos = jam normal, batang bergaris = lembur.</span><span class="num">Upah ${rp(tot)}${totK?` − kasbon proyek ${rp(totK)}`:''} = nilai semua proyek <b style="color:var(--ink)">${rp(tot-totK)}</b></span></div>`:'<p class="muted">Belum ada absensi di periode ini.</p>'}
+    ${list.length?`<div class="row"><label class="row small"><input type="checkbox" id="pj-semua" data-k="prj-semua"${list.every(o=>UI.prj.has(o.p.id))?' checked':''}> Pilih semua proyek</label><span class="grow"></span><button class="btn pri" data-act="pdf-p-pilih">Unduh PDF (${list.filter(o=>UI.prj.has(o.p.id)).length} terpilih)</button></div>${bars}<div class="row small muted"><span class="grow">Klik proyek untuk melihat rincian. Batang polos = jam normal, batang bergaris = lembur.</span><span class="num">Upah ${rp(tot)}${totK?` − kasbon proyek ${rp(totK)}`:''} = nilai semua proyek <b style="color:var(--ink)">${rp(tot-totK)}</b></span></div>`:'<p class="muted">Belum ada absensi di periode ini.</p>'}
   </section>
   <section class="panel kartu">
     <h3>Daftar proyek</h3>
@@ -765,6 +803,8 @@ document.addEventListener('click',e=>{
   switch(act){
     case 'pdf':unduhPDF([id]);return;
     case 'pdf-pilih':unduhPDF([...UI.slip]);return;
+    case 'pdf-p':unduhProyek([id]);return;
+    case 'pdf-p-pilih':unduhProyek([...UI.prj]);return;
     case 'keluar':keluar();return;
     case 'tab':UI.tab=t.dataset.tab;UI.reset=false;UI.salin='';render();window.scrollTo(0,0);return;
     case 'tgl':UI.tgl=addD(UI.tgl,+t.dataset.n);UI.pilih.clear();render();return;
@@ -837,6 +877,8 @@ document.addEventListener('change',e=>{
     if(r.selesai<=r.mulai)toast('Jam selesai normal harus setelah jam mulai')}
   else if(k==='kas'){const x=S.kasbon.find(q=>q.id===id);if(!x)return;x.pid=+v||null;stamp('k|'+id,'Kasbon '+((W(x.wid)||{}).nama||''))}
   else if(k==='ui'){if(!v)return;UI[f]=v;if(f==='tgl')UI.pilih.clear();if(UI.dari>UI.sampai){if(f==='dari')UI.sampai=v;else UI.dari=v}render();return}
+  else if(k==='prj'){v?UI.prj.add(id):UI.prj.delete(id);render();return}
+  else if(k==='prj-semua'){UI.prj.clear();if(v)for(const o of PRJ.list)UI.prj.add(o.p.id);render();return}
   else if(k==='slip'){v?UI.slip.add(id):UI.slip.delete(id);render();return}
   else if(k==='slip-semua'){UI.slip.clear();if(v)for(const o of dataGaji())UI.slip.add(o.w.id);render();return}
   else if(k==='pilih'){v?UI.pilih.add(id):UI.pilih.delete(id);render();return}
