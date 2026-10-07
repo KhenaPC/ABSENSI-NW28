@@ -225,7 +225,7 @@ window.nw28={
 const KEY='nw28-keu';
 const USERS={khena:1,kicky:1,irwan:1};
 function hsh(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)}
-const KAT={keluar:['Material Kayu','Material Besi','Material Finishing','Material Listrik','Aksesoris','Ongkir','Fee','Upah Tukang Kayu','Upah Tukang Finishing','Upah Tukang','Kasbon','Gasoline','Pinjaman','Operational','Lainnya'],masuk:['DP','Termin','Pelunasan','Lainnya']};
+const KAT={keluar:['Material Kayu','Material Besi','Material Finishing','Material Listrik','Aksesoris','Ongkir','Fee','Upah Tukang Kayu','Upah Tukang Finishing','Upah Tukang','Kasbon','Gasoline','Pinjaman','Operational','Belanja Tokopedia','Lainnya'],masuk:['DP','Termin','Pelunasan','Refund','Lainnya']};
 const UMUM='umum';
 const TABS=[['ringkasan','Ringkasan'],['transaksi','Transaksi'],['proyek','Proyek'],['laba','Laba Rugi']];
 const BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -529,6 +529,8 @@ function mTrx(){
       <label class="f">Bank / metode<input type="text" id="t-bank" value="${esc(e.bank)}" placeholder="BCA, tunai, QRIS"></label>
     </div>
     <label class="f">Keterangan<input type="text" id="t-ket" value="${esc(e.ket)}" placeholder="Contoh: besi hollow 4x4 untuk rangka plafon"></label>
+    <label class="f">Catatan (opsional)<input type="text" id="t-catatan" value="${esc(e.catatan)}" placeholder="Hal yang perlu diingat atau dicek"></label>
+    ${e.sumber?`<div class="small muted">Sumber: ${esc(e.sumber)}</div>`:''}
     <label class="f">${e.bukti?'Ganti foto bukti (opsional)':'Foto bukti (opsional)'}<input type="file" id="t-file" accept="image/*">${e.file?`<span class="small muted">Terpilih: ${esc(e.file.name)}</span>`:''}</label>
     ${UI.bukti?`<img class="bukti-img" src="${UI.bukti}" alt="Bukti transaksi">`:''}
     ${baru?'':`<div class="small muted">Diinput oleh <b>${esc(e.oleh||'-')}</b> · ${jam(e.pada)}${e.editOleh?` · terakhir diubah oleh <b>${esc(e.editOleh)}</b> · ${jam(e.editPada)}`:''}</div>`}
@@ -656,7 +658,7 @@ async function tulis(fn,ok){
 async function simpanBaru(x,file){
   const ref=S.db.collection('transaksi').doc();let bukti=false;
   if(file){const img=await kecilkan(file);if(img){try{await S.db.doc('bukti/'+ref.id).set({img,pada:Date.now()});bukti=true}catch(e){}}}
-  await ref.set({tanggal:x.tanggal,jenis:x.jenis,nominal:x.nominal,proyek:x.proyek,kategori:x.kategori,pihak:x.pihak||'',ket:x.ket||'',ref:x.ref||'',bank:x.bank||'',bukti,oleh:UI.user,pada:Date.now()});
+  await ref.set({tanggal:x.tanggal,jenis:x.jenis,nominal:x.nominal,proyek:x.proyek,kategori:x.kategori,pihak:x.pihak||'',ket:x.ket||'',ref:x.ref||'',bank:x.bank||'',catatan:x.catatan||'',bukti,oleh:UI.user,pada:Date.now()});
   return bukti||!file;
 }
 async function simpanDraf(d,diam){
@@ -667,7 +669,7 @@ async function simpanDraf(d,diam){
   gantiDraf(d);return ok;
 }
 function bacaTrx(){const e=UI.edit,v=id=>{const el=document.getElementById(id);return el?el.value.trim():''};
-  e.jenis=$('#t-jenis-m')&&$('#t-jenis-m').checked?'masuk':'keluar';e.nominal=angka(v('t-nominal'));e.tanggal=v('t-tanggal');e.proyek=v('t-proyek');e.kategori=v('t-kategori');e.pihak=v('t-pihak');e.bank=v('t-bank');e.ket=v('t-ket')}
+  e.jenis=$('#t-jenis-m')&&$('#t-jenis-m').checked?'masuk':'keluar';e.nominal=angka(v('t-nominal'));e.tanggal=v('t-tanggal');e.proyek=v('t-proyek');e.kategori=v('t-kategori');e.pihak=v('t-pihak');e.bank=v('t-bank');e.ket=v('t-ket');e.catatan=v('t-catatan')}
 async function kirimTrx(){
   bacaTrx();const e=UI.edit;
   if(!(e.nominal>0)||!e.tanggal||!e.proyek){toast('Lengkapi nominal, tanggal, dan alokasi proyek dulu.');return}
@@ -676,7 +678,7 @@ async function kirimTrx(){
   if(!e.id)ok=await tulis(()=>simpanBaru(e,e.file),'Transaksi tersimpan');
   else ok=await tulis(async()=>{let bukti=!!e.bukti;
     if(e.file){const img=await kecilkan(e.file);if(img){await S.db.doc('bukti/'+e.id).set({img,pada:Date.now()});bukti=true}}
-    await S.db.doc('transaksi/'+e.id).update({tanggal:e.tanggal,jenis:e.jenis,nominal:e.nominal,proyek:e.proyek,kategori:e.kategori,pihak:e.pihak,ket:e.ket,bank:e.bank,bukti,editOleh:UI.user,editPada:Date.now()})},'Perubahan tersimpan');
+    await S.db.doc('transaksi/'+e.id).update({tanggal:e.tanggal,jenis:e.jenis,nominal:e.nominal,proyek:e.proyek,kategori:e.kategori,pihak:e.pihak,ket:e.ket,bank:e.bank,catatan:e.catatan||'',bukti,editOleh:UI.user,editPada:Date.now()})},'Perubahan tersimpan');
   if(ok)tutup();
 }
 async function kirimProyek(){
