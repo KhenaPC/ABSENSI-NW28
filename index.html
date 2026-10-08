@@ -214,6 +214,7 @@ td.ck,th.ck{width:34px;padding-right:0}
 <script>
 //<calc>
 let S;
+const divOf=tipe=>Math.max(1,(S.rules[tipe]&&+S.rules[tipe].div)||(tipe==='garut'?10:8));
 const ov=(a,b,c,d)=>Math.max(0,Math.min(b,d)-Math.max(a,c));
 function sesi(r){
   let out=[[r.mulai,r.selesai]];
@@ -242,11 +243,20 @@ function hitung(w,list){
     const ist=r.ist.reduce((t,[p,q])=>t+ov(s.a,s.b,p,q),0);
     x.eff=s.b-s.a-ist;
     let nm=0;
-    for(const [p,q] of ss){const o=ov(s.a,s.b,p,q);nm+=o;x.bobot+=o/(q-p)*sw}
+    for(const [p,q] of ss)nm+=ov(s.a,s.b,p,q);
     x.lem=Math.max(0,x.eff-nm);
     x.tarif=s.tarif!=null?s.tarif:w.lembur;
-    x.bN=x.bobot*w.upah;
     x.bL=x.lem/60*x.tarif;
+  }
+  if(r.mode!=='argo'){
+    // sesi normal yang terisi penuh = 0,5 hari; jam normal di sesi yang tidak penuh dibayar per jam (upah harian / pembagi)
+    const div=divOf(w.tipe),cover=ss.map(([p,q])=>okd.reduce((t,s)=>t+ov(s.a,s.b,p,q),0));
+    for(const x of rows){
+      if(x.err)continue;
+      x.bobotS=0;x.jn=0;
+      ss.forEach(([p,q],i)=>{const o=ov(x.s.a,x.s.b,p,q);if(!o)return;if(cover[i]>=q-p)x.bobotS+=o/(q-p)*sw;else x.jn+=o});
+      x.bobot=x.bobotS+x.jn/60/div;x.bN=x.bobot*w.upah;
+    }
   }
   const lem=rows.reduce((t,x)=>t+x.lem,0);
   const hari=rows.reduce((t,x)=>t+x.bobot,0);
@@ -410,11 +420,12 @@ function rekap(dari,sampai){
   for(const k in g){const [tgl,wid]=k.split('|');const w=W(+wid);if(w)out.push({tgl,w,h:hitung(w,g[k])})}
   return out.sort((a,b)=>a.tgl<b.tgl?-1:a.tgl>b.tgl?1:0);
 }
+const normTxt=x=>x.jn?`${x.bobotS?num(x.bobotS)+' hari + ':''}${num(x.jn/60)} jam normal`:`${num(x.bobot)} hari`;
 function hasilBlok(x,dobel){
   if(x.err)return `<span class="pill bad">${x.err}</span>`;
   if(x.argo)return `<span class="pill ev num">${x.argo} argo · selesai ${tglPendek(addD(x.s.tgl,x.argo))} ${hm(x.s.a)} · ${rp(x.bN)}</span>`;
   let h='';
-  if(x.bobot>0)h+=`<span class="pill nm num">${num(x.bobot)} hari · ${rp(x.bN)}</span>`;
+  if(x.bobot>0)h+=`<span class="pill nm num">${normTxt(x)} · ${rp(x.bN)}</span>`;
   if(x.lem>0)h+=`<span class="pill ot num">${num(x.lem/60)} jam lembur${dobel?' → 2× upah':''} · ${rp(x.bL)}</span>`;
   if(!h)h='<span class="pill off">jam istirahat, tidak dihitung</span>';
   return h;
@@ -519,7 +530,7 @@ function dataGaji(){
   return Object.values(by).sort((a,b)=>a.w.nama.localeCompare(b.w.nama));
 }
 function rincian(o){
-  return o.days.map(d=>`<div><b>${tglPendek(d.tgl)}</b>${d.h.dobel?'<span class="pill ot">2× upah</span>':''}<span class="num">${rp(d.h.total)}</span></div>`+d.h.rows.filter(x=>!x.err).map(x=>{const p=P(x.s.pid);return `<div class="muted"><span class="num">${jamTxt(x)}</span><span><i class="dot" style="background:${p?p.warna:'var(--muted)'}"></i> ${esc(p?p.nama:'?')}</span><span class="num">${x.bobot?num(x.bobot)+' hari ':''}${x.lem?num(x.lem/60)+' jam lembur ':''}· ${rp(x.bN+x.bL)}</span></div>`}).join('')).join('');
+  return o.days.map(d=>`<div><b>${tglPendek(d.tgl)}</b>${d.h.dobel?'<span class="pill ot">2× upah</span>':''}<span class="num">${rp(d.h.total)}</span></div>`+d.h.rows.filter(x=>!x.err).map(x=>{const p=P(x.s.pid);return `<div class="muted"><span class="num">${jamTxt(x)}</span><span><i class="dot" style="background:${p?p.warna:'var(--muted)'}"></i> ${esc(p?p.nama:'?')}</span><span class="num">${x.bobot?normTxt(x)+' ':''}${x.lem?num(x.lem/60)+' jam lembur ':''}· ${rp(x.bN+x.bL)}</span></div>`}).join('')).join('');
 }
 let LOGO='';
 function logoURL(){
@@ -710,12 +721,13 @@ function vPekerja(){
     <td><input type="text" id="w${w.id}n" data-k="w" data-id="${w.id}" data-f="nama" value="${esc(w.nama)}" aria-label="Nama" style="width:150px">${ed('w|'+w.id)}</td>
     <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="tipe" aria-label="Tipe">${opsiTipe(w.tipe)}</select></td>
     <td><input type="number" id="w${w.id}u" min="0" step="5000" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="upah" value="${w.upah}" aria-label="Upah harian"></td>
+    <td class="num">${w.tipe==='event'?'<span class="muted">–</span>':`${rp(w.upah/divOf(w.tipe))}<span class="edited" style="display:block">upah harian ÷ ${divOf(w.tipe)}</span>`}</td>
     <td><input type="number" id="w${w.id}l" min="0" step="500" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="lembur" value="${w.lembur}"${w.tipe==='event'?' disabled':''} aria-label="Tarif lembur per jam"></td>
     <td><label class="row small"><input type="checkbox" id="w${w.id}a" data-k="w" data-id="${w.id}" data-f="aktif"${w.aktif?' checked':''}> Aktif</label></td>
     <td><button class="x" data-act="del-w" data-id="${w.id}" aria-label="Hapus pekerja">×</button></td></tr>`).join('');
   return `<div><div class="label">Master data</div><h2 style="font-size:24px">Pekerja</h2></div>
   <section class="panel">
-    <div class="tbl"><table><thead><tr><th>Nama</th><th>Tipe</th><th>Upah harian / per argo (Rp)</th><th>Lembur per jam (Rp)</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Nama</th><th>Tipe</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="small muted">Upah dan tarif lembur diisi manual per orang. Semua hitungan di tab lain mengikuti otomatis.</p>
   </section>
   <section class="panel kartu">
@@ -739,6 +751,7 @@ function vAturan(){
     <p class="small muted">Contoh: berangkat Senin 18:00, argo selesai Selasa 18:00. Kalau lanjut, tambah jumlah argo.</p></section>`;const d=`data-k="r" data-tipe="${tp}"`;return `<section class="panel">
     <h3><span class="pill ${PC[tp]}">${TIPE[tp]}</span></h3>
     <div class="field"><span>Jam kerja normal</span><span class="row"><select id="r${tp}m" ${d} data-f="mulai" aria-label="Mulai">${opsiJam(r.mulai)}</select>–<select id="r${tp}s" ${d} data-f="selesai" aria-label="Selesai">${opsiJam(r.selesai)}</select></span></div>
+    <div class="field"><span>Upah normal per jam</span><span class="row">upah harian ÷ <input type="number" min="1" step="1" inputmode="numeric" id="r${tp}dv" ${d} data-f="div" value="${divOf(tp)}" style="width:72px" aria-label="Pembagi upah per jam"></span></div>
     ${r.ist.map((x,i)=>`<div class="field"><span>Istirahat ${i+1}</span><span class="row"><select id="r${tp}i${i}a" ${d} data-f="ist" data-i="${i}" data-j="0" aria-label="Mulai istirahat">${opsiJam(x[0])}</select>–<select id="r${tp}i${i}b" ${d} data-f="ist" data-i="${i}" data-j="1" aria-label="Selesai istirahat">${opsiJam(x[1])}</select></span></div>`).join('')}
     <div class="field"><label class="row" for="r${tp}d"><input type="checkbox" id="r${tp}d" ${d} data-f="dobel"${r.dobel?' checked':''}> Upah jadi 2× bila masuk di jam normal dan keluar jam</label><select id="r${tp}j" ${d} data-f="dobelJam" aria-label="Jam batas 2×">${opsiJam(r.dobelJam)}</select></div>
     ${r.dobel?`<div class="field"><span>Saat kena 2×, jam lembur malam itu</span><select id="r${tp}g" ${d} data-f="ganti" aria-label="Cara hitung 2×"><option value="1"${r.ganti?' selected':''}>diganti 1 hari upah (total 2 hari)</option><option value="0"${r.ganti?'':' selected'}>tetap dibayar + 1 hari upah</option></select></div>`:''}
@@ -750,6 +763,7 @@ function vAturan(){
     <h3>Cara aplikasi menghitung</h3>
     <ul>
       <li>Jam kerja normal dibagi jadi sesi oleh jam istirahat. Dengan 08:00–16:00 dan istirahat 12:00–13:00, ada dua sesi dan masing-masing bernilai <b>0,5 hari</b>.</li>
+      <li>Jam normal di sesi yang tidak terisi penuh dibayar per jam: upah harian ÷ 8 untuk Workshop NW28 dan ÷ 10 untuk Tim Garut (bisa diubah di atas). Contoh: kerja 15:00–16:00 dengan upah Rp140.000 dibayar 1 jam × Rp17.500.</li>
       <li>Kalau pekerja pindah proyek di tengah sesi, nilai sesi dibagi sesuai jamnya. Biaya normal = bobot hari × upah harian.</li>
       <li>Semua jam di luar jam normal adalah <b>lembur</b>, dipotong jam istirahat. Biaya lembur = jam lembur × tarif lembur per jam pekerja itu, dan masuk ke proyek yang dipilih di blok tersebut.</li>
       <li>Kerja lewat tengah malam diisi di tanggal mulainya: pilih jam selesai bertanda "(besok)", sampai 08:00. Semua jamnya dihitung sebagai lembur hari itu.</li>
