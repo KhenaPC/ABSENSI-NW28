@@ -589,7 +589,27 @@ const slug=s=>s.trim().replace(/[^A-Za-z0-9]+/g,'-');
 function unduhPDF(ids){
   const rows=dataGaji().filter(o=>ids.includes(o.w.id));
   if(!rows.length){toast('Centang dulu pekerja yang mau diunduh');return}
-  buatPDF(rows.map(slipHTML),`Slip-${rows.length===1?slug(rows[0].w.nama):rows.length+'-pekerja'}_${UI.dari}_${UI.sampai}.pdf`,rows.length===1?'PDF slip diunduh':`PDF berisi ${rows.length} slip diunduh`);
+  buatPDF((rows.length>1?[ringkasHTML(rows)]:[]).concat(rows.map(slipHTML)),`Slip-${rows.length===1?slug(rows[0].w.nama):rows.length+'-pekerja'}_${UI.dari}_${UI.sampai}.pdf`,rows.length===1?'PDF slip diunduh':`PDF berisi ${rows.length} slip diunduh`);
+}
+function ringkasHTML(rows){
+  const T={hari:0,lem:0,bN:0,bL:0,kas:0};for(const o of rows)for(const k in T)T[k]+=o[k];
+  const lg=logoURL(),net=T.bN+T.bL-T.kas;
+  return `<div class="slip lap">
+    <div class="slip-head">${lg?`<img src="${lg}" alt="">`:''}<div><div class="label">Rekap upah</div><h2>${rows.length} pekerja</h2><div class="small muted">Periode ${tglPanjang(UI.dari)} – ${tglPanjang(UI.sampai)}</div></div>
+      <div style="margin-left:auto;text-align:right"><div class="label">Total diterima semua pekerja</div><div class="big num" style="font-size:32px;color:var(--brand)">${rp(net)}</div></div></div>
+    <div class="tiles in">
+      <div class="tile"><span class="label">Upah normal</span><strong>${rp(T.bN)}</strong><span class="small muted num">${num(T.hari)} hari</span></div>
+      <div class="tile t-ot"><span class="label">Upah lembur</span><strong>${rp(T.bL)}</strong><span class="small muted num">${num(T.lem/60)} jam lembur</span></div>
+      <div class="tile"><span class="label">Kasbon</span><strong>${T.kas?'−'+rp(T.kas):'–'}</strong><span class="small muted">dipotong dari upah</span></div>
+      <div class="tile t-br"><span class="label">Total diterima</span><strong>${rp(net)}</strong><span class="small muted">${rows.length} pekerja</span></div>
+    </div>
+    <table>
+      <thead><tr><th>Pekerja</th><th>Tipe</th><th class="r">Hari</th><th class="r">Jam lembur</th><th class="r">Upah normal</th><th class="r">Upah lembur</th><th class="r">Kasbon</th><th class="r">Diterima</th></tr></thead>
+      <tbody>${rows.map(o=>`<tr><td><b>${esc(o.w.nama)}</b></td><td><span class="pill ${PC[o.w.tipe]}">${TIPE[o.w.tipe]}</span></td><td class="r">${num(o.hari)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bN)}</td><td class="r">${rp(o.bL)}</td><td class="r">${o.kas?'−'+rp(o.kas):'–'}</td><td class="r big">${rp(o.bN+o.bL-o.kas)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="2">Total</td><td class="r">${num(T.hari)}</td><td class="r">${num(T.lem/60)}</td><td class="r">${rp(T.bN)}</td><td class="r">${rp(T.bL)}</td><td class="r">${T.kas?'−'+rp(T.kas):'–'}</td><td class="r big">${rp(net)}</td></tr></tfoot>
+    </table>
+    <div class="small muted">Slip tiap pekerja ada di halaman berikutnya. Dibuat ${jamEdit(Date.now())} oleh ${esc(UI.user)} · NW28 Absensi · Natawira Dwi Ashta</div>
+  </div>`;
 }
 let PRJ={list:[],detail:()=>''};
 function lapHTML(o){
