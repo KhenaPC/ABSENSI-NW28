@@ -157,6 +157,7 @@ td .sub{display:block;font-size:12px;color:var(--muted)}
 .foot .lg-mark{width:26px}
 .empty{color:var(--muted);padding:14px 0;text-align:center}
 nav.tabs{flex-wrap:wrap;overflow:visible}
+.share{margin-top:2px}
 .ak-list{display:flex;flex-direction:column;gap:6px}.ak{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;cursor:pointer;font-weight:600}.ak:has(input:checked){border-color:var(--brand);background:var(--brand-soft)}.ak input{width:18px;height:18px;accent-color:var(--brand)}
 #tip{position:fixed;z-index:40;background:var(--ink);color:var(--bg);padding:8px 11px;border-radius:9px;font-size:12.5px;pointer-events:none;max-width:240px;line-height:1.5;font-variant-numeric:tabular-nums}
 #tip b{display:block}
@@ -223,6 +224,7 @@ window.nw28={
   me:async()=>tok()?await rpc('keu_me',{p_token:tok()}):null,
   users:async()=>(await rpc('keu_users_list',{p_token:tok()})).users,
   setAkses:(u,a)=>rpc('keu_set_akses',{p_token:tok(),p_user:u,p_akses:a}),
+  log:async b=>(await rpc('keu_log_list',{p_token:tok(),p_before:b||null})).log,
   passwd:async(o,n)=>(await rpc('keu_passwd',{p_token:tok(),p_old:o,p_new:n})).status
 };
 })();
@@ -239,7 +241,7 @@ const BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','De
 const S={db:null,sample:null,bisaScan:false,ro:false,siapP:false,siapT:false,mati:false,proyek:[],trx:[]};
 S.role='';S.users=null;
 const ADM=()=>S.role==='admin',OWN=()=>S.role==='owner';
-function muatPeran(){if(window.nw28&&window.nw28.me)window.nw28.me().then(m=>{if(m&&m.status==='ok'){S.role=m.role;if(!OWN()&&UI.tab==='akses')UI.tab='ringkasan';render()}}).catch(()=>{})}
+function muatPeran(){if(window.nw28&&window.nw28.me)window.nw28.me().then(m=>{if(m&&m.status==='ok'){S.role=m.role;if((!OWN()&&UI.tab==='akses')||(ADM()&&UI.tab==='riwayat'))UI.tab='ringkasan';render()}}).catch(()=>{})}
 const UI={tab:'ringkasan',user:'',loginErr:false,loginU:'',f:{proyek:'',jenis:'',bulan:'',q:''},pl:{bulan:'',proyek:''},rk:'',modal:'',edit:null,scan:[],bukti:''};
 try{const u=localStorage.getItem(KEY+'-user');if(u&&USERS[u]&&localStorage.getItem(KEY+'-token'))UI.user=u;const t=localStorage.getItem(KEY+'-tab');if(TABS.some(x=>x[0]===t))UI.tab=t}catch(e){}
 
@@ -273,7 +275,7 @@ const bulanAda=()=>[...new Set(S.trx.map(t=>t.tanggal.slice(0,7)))].sort().rever
 /* ---------- tampilan ---------- */
 function renderHead(){
   const on=!!UI.user;
-  $('#tabs').innerHTML=on?TABS.concat(OWN()?[['akses','Akses Admin']]:[]).map(([k,l])=>`<button data-tab="${k}"${UI.tab===k?' aria-current="page"':''}>${l}</button>`).join(''):'';
+  $('#tabs').innerHTML=on?TABS.concat(OWN()?[['akses','Akses Admin']]:[]).concat(S.role&&!ADM()?[['riwayat','Riwayat']]:[]).map(([k,l])=>`<button data-tab="${k}"${UI.tab===k?' aria-current="page"':''}>${l}</button>`).join(''):'';
   $('#who').innerHTML=on?`<span>Masuk sebagai <b>${esc(NAMA[UI.user]||UI.user)}</b>${S.role?` <span class="pill ${OWN()?'gr':'ws'}">${PERAN[S.role]}</span>`:''}</span><button data-act="sandi">Ganti password</button><button data-act="keluar">Keluar</button>`:'';
 }
 function render(){
@@ -285,7 +287,7 @@ function render(){
   const contoh=S.proyek.some(p=>p.contoh)||S.trx.some(t=>t.contoh);
   app.innerHTML=(contoh?`<div class="banner w"><span class="grow"><b>Yang tampil sekarang masih data contoh.</b> Angka dan nama proyeknya bukan milik NW28, hanya untuk memperlihatkan cara kerja aplikasi.</span>${S.ro?'':'<button class="btn" data-act="hapus-contoh">Hapus semua data contoh</button>'}</div>`:'')
     +(S.ro?'<div class="banner"><span>Akun ini hanya bisa melihat. Minta Khena menaikkan aksesnya supaya bisa menginput.</span></div>':'')
-    +(({ringkasan:vRingkasan,transaksi:vTransaksi,proyek:vProyek,laba:vLaba,akses:vAkses})[UI.tab]||vRingkasan)()+kaki();
+    +(({ringkasan:vRingkasan,transaksi:vTransaksi,proyek:vProyek,laba:vLaba,akses:vAkses,riwayat:vRiwayat})[UI.tab]||vRingkasan)()+kaki();
   if(fid){const el=document.getElementById(fid);if(el){el.focus();try{if(pos!=null)el.setSelectionRange(pos,pos)}catch(e){}}}
 }
 const kaki=()=>'<div class="foot"><i class="lg-mark" aria-hidden="true"></i><span>Natawira Dwi Ashta</span></div>';
@@ -330,7 +332,7 @@ function kartuProyek(p,ubah){
     <div class="k-total"><div class="label">RAB</div><strong>${rab?rp(rab):'Belum diisi'}</strong></div></div>
     ${p.klien?`<div class="small muted">Klien: ${esc(p.klien)}</div>`:''}
     ${meter('Pemasukan',h.m,rab,'m')}${meter('Pengeluaran',h.k,rab,'k')}
-    <div class="row">${labaPill(h)}${rab>0?`<span class="small muted">Belum ditagih dari RAB: <b class="num">${rp(Math.max(0,rab-h.m))}</b></span>`:''}
+    ${ubah&&OWN()?shareBox(p):''}<div class="row">${labaPill(h)}${rab>0?`<span class="small muted">Belum ditagih dari RAB: <b class="num">${rp(Math.max(0,rab-h.m))}</b></span>`:''}
     ${ubah&&!S.ro&&!ADM()?`<button class="btn" style="margin-left:auto" data-act="edit-proyek" data-id="${p.id}">Ubah</button>`:''}</div></article>`;
 }
 function barisTrx(t){
@@ -481,7 +483,7 @@ async function buatPdfLayar(L){
   let total=null,atoms=[],start=0,n=0;
   const siap=(d,el)=>{
     const st=d.createElement('style');
-    st.textContent='*{transition:none!important;animation:none!important;font-variant-numeric:normal!important}#app .btn,#app .tbl+.small,#app label:has(#rk-proyek){display:none!important}#app{padding-block:20px 20px!important;max-width:'+W+'px!important}#app .foot{padding-top:6px}';
+    st.textContent='*{transition:none!important;animation:none!important;font-variant-numeric:normal!important}#app .btn,#app .tbl+.small,#app label:has(#rk-proyek),#app .share{display:none!important}#app{padding-block:20px 20px!important;max-width:'+W+'px!important}#app .foot{padding-top:6px}';
     d.head.appendChild(st);
     const h=d.createElement('div'),tx=d.createElement('div'),a=d.createElement('div'),b=d.createElement('div');h.className='pdf-head';h.style.cssText='display:flex;align-items:center;gap:12px';
     if(lgInk){const im=d.createElement('img');im.src=lgInk;im.style.cssText='width:36px;height:auto;flex:none';h.appendChild(im)}
@@ -568,7 +570,7 @@ function mSandi(){return `${kepalaDlg('Ganti password')}
     <div class="row"><button class="btn pri" type="submit">Simpan password</button></div></form>`}
 function vAkses(){
   if(!OWN())return '<section class="panel empty">Halaman ini hanya untuk owner.</section>';
-  if(!S.users){window.nw28.users().then(u=>{S.users=u||[];render()},()=>{S.users=[];toast('Gagal memuat daftar pengguna.')});return '<section class="panel muted">Memuat daftar pengguna…</section>'}
+  if(!S.users){muatUsers();return '<section class="panel muted">Memuat daftar pengguna…</section>'}
   UI.akses=UI.akses||{};
   return `<div class="row"><h2 class="grow">Akses Admin</h2></div>
   <div class="small muted">Centang proyek yang boleh dilihat dan diinput tiap admin. Admin tidak bisa melihat proyek lain dan overhead kantor, dan tidak bisa menambah atau mengubah proyek dan RAB.</div>
@@ -578,6 +580,56 @@ function vAkses(){
     return `<article class="panel"><div class="k-head"><h3>${nm}</h3>${pill}<span class="small muted" style="margin-left:auto">username: ${esc(u.user)}</span></div>
       <div class="ak-list">${S.proyek.length?S.proyek.map(p=>`<label class="ak"><input type="checkbox" id="ak-${esc(u.user)}-${p.id}" data-ak="${esc(u.user)}" value="${p.id}"${set.has(p.id)?' checked':''}><i class="dot" style="background:${warnaP(p.id)}"></i><span>${esc(p.nama)}</span></label>`).join(''):'<div class="empty">Belum ada proyek.</div>'}</div>
       <div class="row"><span class="small muted grow" id="akn-${esc(u.user)}">${set.size} dari ${S.proyek.length} proyek dipilih</span><button class="btn pri" data-act="simpan-akses" data-id="${esc(u.user)}">Simpan akses</button></div></article>`}).join('')}</div>`;
+}
+let usersLoading=false;
+function muatUsers(){if(usersLoading||!OWN()||!window.nw28)return;usersLoading=true;window.nw28.users().then(u=>{S.users=u||[];usersLoading=false;render()},()=>{usersLoading=false;S.users=S.users||[];toast('Gagal memuat daftar pengguna.')})}
+function shareBox(p){
+  if(!S.users){muatUsers();return ''}
+  const adm=S.users.filter(u=>u.role==='admin');
+  return adm.map(u=>`<label class="ak share"><input type="checkbox" id="sh-${esc(u.user)}-${p.id}" data-share="${esc(u.user)}" value="${p.id}"${(u.akses||[]).includes(p.id)?' checked':''}><span>Share proyek ke admin${adm.length>1?` <span class="small muted">(${esc(NAMA[u.user]||u.user)})</span>`:''}</span></label>`).join('');
+}
+/* ---------- riwayat ---------- */
+let logLoading=false;
+function muatLog(lanjut){
+  if(logLoading||!window.nw28)return;logLoading=true;
+  const before=lanjut&&S.log&&S.log.length?S.log[S.log.length-1].id:null;
+  window.nw28.log(before).then(l=>{l=l||[];S.log=(lanjut&&S.log?S.log:[]).concat(l);S.logHabis=l.length<200;logLoading=false;render()},()=>{logLoading=false;S.log=S.log||[];toast('Gagal memuat riwayat.')});
+}
+const LBL={tanggal:'Tanggal',jenis:'Jenis',nominal:'Nominal',proyek:'Proyek',kategori:'Kategori',ket:'Keterangan',pihak:'Pihak',bank:'Bank/metode',catatan:'Catatan',nama:'Nama proyek',klien:'Klien',rab:'RAB',status:'Status'};
+const AKSI={tambah:['Tambah','gr'],ubah:['Ubah','ws'],hapus:['Hapus','bad'],impor:['Impor','wr'],akses:['Akses admin','ws'],bukti:['Foto bukti','off'],password:['Ganti password','off']};
+function nilaiLog(k,v){if(v==null||v==='')return '–';if(k==='nominal'||k==='rab')return rp(+v);if(k==='tanggal')return tgl(v);if(k==='proyek')return namaP(v);if(k==='jenis')return v==='masuk'?'Pemasukan':'Pengeluaran';if(k==='status')return v==='selesai'?'Selesai':'Berjalan';return String(v)}
+function waktuLog(iso){const d=new Date(iso);return `${d.getDate()} ${BLN[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2,'0')}.${String(d.getMinutes()).padStart(2,'0')}`}
+function isiLog(e){
+  const d=e.sesudah||e.sebelum||{},pn=e.proyekNama||(e.proyek?namaP(e.proyek):'');
+  if(e.aksi==='impor')return `<b>${d.jumlah} transaksi diimpor</b><span class="sub">${esc(d.sumber||'')}${pn?' · '+esc(pn):''} · masuk ${rp(+d.masuk||0)} · keluar ${rp(+d.keluar||0)}</span>`;
+  if(e.aksi==='akses'){const a=new Set((e.sebelum&&e.sebelum.akses)||[]),b=new Set((e.sesudah&&e.sesudah.akses)||[]),plus=[...b].filter(x=>!a.has(x)),min=[...a].filter(x=>!b.has(x));
+    return `<b>Akses ${esc(NAMA[e.doc]||e.doc)}</b><span class="sub">${plus.length?'Dibuka: '+plus.map(x=>esc(namaP(x))).join(', '):''}${plus.length&&min.length?' · ':''}${min.length?'Ditutup: '+min.map(x=>esc(namaP(x))).join(', '):''}${!plus.length&&!min.length?'Tidak ada perubahan':''}</span>`}
+  if(e.aksi==='password')return `<b>Ganti password</b>`;
+  if(e.aksi==='bukti')return `<b>Foto bukti transaksi</b>${pn?`<span class="sub">${esc(pn)}</span>`:''}`;
+  if(e.coll==='proyek')return `<b>Proyek ${esc(d.nama||'')}</b><span class="sub">RAB ${rp(+d.rab||0)}${d.klien?' · '+esc(d.klien):''}</span>`;
+  return `<b>${d.jenis==='masuk'?'Pemasukan':'Pengeluaran'} ${rp(+d.nominal||0)}</b><span class="sub">${esc(d.ket||'(tanpa keterangan)')}${pn?' · '+esc(pn):''}${d.tanggal?' · '+tgl(d.tanggal):''}</span>`;
+}
+function detailLog(e){
+  if(e.aksi!=='ubah')return '';
+  if(!e.sebelum)return '<span class="small muted">Isi sebelum diubah tidak tercatat (perubahan sebelum riwayat aktif)</span>';
+  const ch=Object.keys(LBL).filter(k=>JSON.stringify(e.sebelum[k]??'')!==JSON.stringify(e.sesudah[k]??''));
+  return ch.length?ch.map(k=>`<div class="small"><b>${LBL[k]}:</b> ${esc(nilaiLog(k,e.sebelum[k]))} → ${esc(nilaiLog(k,e.sesudah[k]))}</div>`).join(''):'<span class="small muted">Tidak ada perubahan isi</span>';
+}
+function vRiwayat(){
+  if(ADM())return '<section class="panel empty">Riwayat hanya untuk owner dan staf.</section>';
+  if(!S.log){muatLog(false);return '<section class="panel muted">Memuat riwayat perubahan…</section>'}
+  UI.lg=UI.lg||{user:'',aksi:''};
+  const users=[...new Set(S.log.map(e=>e.user))].sort(),list=S.log.filter(e=>(!UI.lg.user||e.user===UI.lg.user)&&(!UI.lg.aksi||e.aksi===UI.lg.aksi));
+  return `<div class="row"><h2 class="grow">Riwayat perubahan</h2><button class="btn" data-act="log-ulang">Muat ulang</button></div>
+  <section class="panel"><div class="fbar">
+    <label class="f">Oleh<select id="lg-user" data-lg="user">${opsi([['','Semua orang'],...users.map(u=>[u,NAMA[u]||u])],UI.lg.user)}</select></label>
+    <label class="f">Aksi<select id="lg-aksi" data-lg="aksi">${opsi([['','Semua aksi'],...Object.entries(AKSI).map(([k,v])=>[k,v[0]])],UI.lg.aksi)}</select></label>
+  </div>
+  ${list.length?`<div class="tbl"><table><thead><tr><th>Waktu</th><th>Oleh</th><th>Aksi</th><th>Data</th><th>Perubahan</th></tr></thead><tbody>
+  ${list.map(e=>{const a=AKSI[e.aksi]||[e.aksi,'off'];return `<tr><td class="num" style="white-space:nowrap">${waktuLog(e.at)}</td><td>${esc(NAMA[e.user]||e.user)}</td><td><span class="pill ${a[1]}">${a[0]}</span></td><td>${isiLog(e)}</td><td>${detailLog(e)}</td></tr>`}).join('')}
+  </tbody></table></div>`:'<div class="empty">Belum ada riwayat yang cocok.</div>'}
+  ${S.logHabis?'':'<div class="row"><button class="btn soft" data-act="log-lagi">Muat riwayat lebih lama</button></div>'}
+  <div class="small muted">Setiap tambah, ubah, dan hapus data, perubahan akses admin, serta ganti password tercatat otomatis di server, beserta waktu dan siapa yang melakukannya. Riwayat tidak bisa diubah dari aplikasi.</div></section>`;
 }
 function mirip(d){return S.trx.find(t=>(d.ref&&t.ref&&t.ref===d.ref)||(t.nominal===d.nominal&&d.nominal>0&&t.tanggal===d.tanggal&&t.jenis===d.jenis))}
 function vDraf(d){
@@ -718,11 +770,13 @@ function yakin(btn){if(btn.dataset.yakin==='1')return true;btn.dataset.yakin='1'
 document.addEventListener('click',async ev=>{
   if(ev.target.id==='modal'){if(UI.modal!=='scan')tutup();return}
   const tb=ev.target.closest('[data-tab]');
-  if(tb){UI.tab=tb.dataset.tab;try{localStorage.setItem(KEY+'-tab',UI.tab)}catch(e){}render();window.scrollTo(0,0);return}
+  if(tb){UI.tab=tb.dataset.tab;if(UI.tab==='riwayat')S.log=null;try{localStorage.setItem(KEY+'-tab',UI.tab)}catch(e){}render();window.scrollTo(0,0);return}
   const b=ev.target.closest('[data-act]');if(!b)return;const id=b.dataset.id;
   switch(b.dataset.act){
-    case 'keluar':window.nw28.logout();S.role='';S.users=null;UI.akses={};S.siapP=S.siapT=false;S.proyek=[];S.trx=[];UI.user='';try{localStorage.removeItem(KEY+'-user')}catch(e){}tutup();render();break;
+    case 'keluar':window.nw28.logout();S.role='';S.users=null;S.log=null;UI.akses={};S.siapP=S.siapT=false;S.proyek=[];S.trx=[];UI.user='';try{localStorage.removeItem(KEY+'-user')}catch(e){}tutup();render();break;
     case 'tutup':tutup();break;
+    case 'log-ulang':S.log=null;render();break;
+    case 'log-lagi':b.disabled=true;muatLog(true);break;
     case 'simpan-akses':{const set=(UI.akses||{})[id]||new Set(((S.users||[]).find(x=>x.user===id)||{}).akses||[]);b.disabled=true;
       window.nw28.setAkses(id,[...set]).then(()=>{toast('Akses '+(NAMA[id]||id)+' disimpan');S.users=null;if(UI.akses)delete UI.akses[id];render()},()=>{b.disabled=false;toast('Gagal menyimpan akses. Coba lagi.')});break}
     case 'sandi':buka('sandi');break;
@@ -761,7 +815,10 @@ document.addEventListener('input',ev=>{
 });
 document.addEventListener('change',ev=>{
   const el=ev.target;
+  if(el.dataset.share){const u=(S.users||[]).find(x=>x.user===el.dataset.share);if(!u)return;const pid=el.value,on=el.checked,baru=on?[...new Set([...(u.akses||[]),pid])]:(u.akses||[]).filter(x=>x!==pid);el.disabled=true;
+    window.nw28.setAkses(u.user,baru).then(()=>{u.akses=baru;if(UI.akses)delete UI.akses[u.user];el.disabled=false;toast((on?'Dibagikan ke ':'Tidak lagi dibagikan ke ')+(NAMA[u.user]||u.user)+': '+namaP(pid))},()=>{el.checked=!on;el.disabled=false;toast('Gagal menyimpan. Coba lagi.')});return}
   if(el.dataset.ak){const u=el.dataset.ak;UI.akses=UI.akses||{};UI.akses[u]=UI.akses[u]||new Set(((S.users||[]).find(x=>x.user===u)||{}).akses||[]);el.checked?UI.akses[u].add(el.value):UI.akses[u].delete(el.value);const c=document.getElementById('akn-'+u);if(c)c.textContent=UI.akses[u].size+' dari '+S.proyek.length+' proyek dipilih';return}
+  if(el.dataset.lg){UI.lg=UI.lg||{};UI.lg[el.dataset.lg]=el.value;render();return}
   if(el.id==='rk-proyek'){UI.rk=el.value;render()}
   else if(el.dataset.flt){UI.f[el.dataset.flt]=el.value;render()}
   else if(el.dataset.pl){UI.pl[el.dataset.pl]=el.value;render()}
