@@ -288,6 +288,10 @@ function hitung(w,list){
 const KEY='nw28-absensi-v1', T0=360, T1=1440, TMAX=1920; // blok kerja boleh sampai 08:00 hari berikutnya
 const TIPE={workshop:'Workshop NW28',garut:'Tim Garut',event:'Event'}, PC={workshop:'ws',garut:'gr',event:'ev'};
 const ARGO=()=>({mode:'argo',mulai:0,selesai:1440,ist:[]});
+const GR=id=>(S.grup||[]).find(g=>g.id===id);
+const grupNama=w=>{const g=w.grup&&GR(w.grup);return g?g.nama:TIPE[w.tipe]};
+const setGrup=(w,v)=>{if(v[0]==='g'){const g=GR(+v.slice(1));if(g){w.grup=g.id;w.tipe=g.aturan}}else{w.grup=null;w.tipe=v}};
+const opsiGrup=(v,pendek)=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('')+(S.grup||[]).map(g=>`<option value="g${g.id}"${'g'+g.id===v?' selected':''}>${esc(g.nama)}${pendek?'':` (aturan ${TIPE[g.aturan]})`}</option>`).join('');
 const opsiTipe=v=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('');
 const jamTxt=x=>x.argo?`${hm(x.s.a)} + ${x.argo}×24 jam`:`${hm(x.s.a)}–${hm(x.s.b)}`;
 const WARNA=['#2F6BFF','#12A594','#E0338B','#E5A800','#8B5CF6','#FF7A1A','#3FAE3A','#E5484D'];
@@ -336,7 +340,7 @@ function seed(){
 }
 const SB_URL='https://gomgkfjyrbfsimpjpgaq.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbWdrZmp5cmJmc2ltcGpwZ2FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MDU1NTQsImV4cCI6MjA5OTE4MTU1NH0.QMASEClyaxP8xLHMH8ohaHQlnliR8Pew-0BYAe-WWzA';
 const RULE=(mulai,selesai,dobel)=>({mulai,selesai,ist:[[720,780],[1080,1140]],dobel,dobelJam:1380,ganti:true});
-function kosong(){return {contoh:false,v2:true,nid:1000,workers:[],projects:[],rules:{workshop:RULE(480,960,false),garut:RULE(420,1020,true),event:ARGO()},segs:[],kasbon:[],edit:{},log:[]}}
+function kosong(){return {contoh:false,v2:true,nid:1000,workers:[],projects:[],rules:{workshop:RULE(480,960,false),garut:RULE(420,1020,true),event:ARGO()},segs:[],kasbon:[],grup:[],edit:{},log:[]}}
 S=kosong();
 let VER=0,CRED=null,saving=false,dirty=false,saveT=0;
 async function rpc(fn,body){
@@ -344,7 +348,7 @@ async function rpc(fn,body){
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];if(!S.rules.event)S.rules.event=ARGO()}
+function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];if(!S.rules.event)S.rules.event=ARGO()}
 function setSync(t){UI.sync=t;const e=document.getElementById('sync');if(e)e.textContent=t}
 async function masuk(u,p){
   const r=await rpc('nw28_load',{p_user:u,p_pass:p,p_have:null});
@@ -471,7 +475,7 @@ function kartu(w,h){
     <div class="k-head">
       <input type="checkbox" id="pl${w.id}" data-k="pilih" data-id="${w.id}"${UI.pilih.has(w.id)?' checked':''} aria-label="Pilih ${esc(w.nama)}">
       <h3>${esc(w.nama)}</h3>
-      <span class="pill ${PC[w.tipe]}">${TIPE[w.tipe]}</span>
+      <span class="pill ${PC[w.tipe]}">${grupNama(w)}</span>
       <span class="muted small num">${ev?`${rp(w.upah)} per argo (24 jam)`:`${rp(w.upah)}/hari · lembur ${rp(w.lembur)}/jam`}</span>
       <div class="k-total">${h.dobel?'<span class="pill ot">2× upah harian</span> ':''}${hadir?`<strong>${rp(h.total)}</strong><div class="muted small num">${num(h.hari)} ${ev?'argo':'hari'}${h.lem?` + ${num(h.lem/60)} jam lembur`:''}${h.syarat!=null&&!h.dobel?` · 2× upah bila keluar ${h.syarat<=TMAX?hm(h.syarat):'lewat 08:00 besok'}`:''}</div>`:'<span class="pill off">Belum diisi</span>'}</div>
     </div>
@@ -543,7 +547,7 @@ function slipHTML(o){
   const kas=S.kasbon.filter(k=>k.wid===o.w.id&&k.tgl>=UI.dari&&k.tgl<=UI.sampai).sort((a,b)=>a.tgl<b.tgl?-1:1);
   const lg=logoURL();
   return `<div class="slip">
-    <div class="slip-head">${lg?`<img src="${lg}" alt="">`:''}<div><div class="label">Slip upah</div><h2>${esc(o.w.nama)}</h2><div class="small muted"><span class="pill ${PC[o.w.tipe]}">${TIPE[o.w.tipe]}</span> &nbsp;Periode ${tglPanjang(UI.dari)} – ${tglPanjang(UI.sampai)}</div></div></div>
+    <div class="slip-head">${lg?`<img src="${lg}" alt="">`:''}<div><div class="label">Slip upah</div><h2>${esc(o.w.nama)}</h2><div class="small muted"><span class="pill ${PC[o.w.tipe]}">${grupNama(o.w)}</span> &nbsp;Periode ${tglPanjang(UI.dari)} – ${tglPanjang(UI.sampai)}</div></div></div>
     <table>
       <thead><tr><th class="r">Hari</th><th class="r">Jam lembur</th><th class="r">Upah normal</th><th class="r">Upah lembur</th><th class="r">Kasbon</th><th class="r">Diterima</th></tr></thead>
       <tbody><tr><td class="r">${num(o.hari)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bN)}</td><td class="r">${rp(o.bL)}</td><td class="r">${o.kas?'−'+rp(o.kas):'–'}</td><td class="r big" style="font-size:18px">${rp(o.bN+o.bL-o.kas)}</td></tr></tbody>
@@ -605,7 +609,7 @@ function ringkasHTML(rows){
     </div>
     <table>
       <thead><tr><th>Pekerja</th><th>Tipe</th><th class="r">Hari</th><th class="r">Jam lembur</th><th class="r">Upah normal</th><th class="r">Upah lembur</th><th class="r">Kasbon</th><th class="r">Diterima</th></tr></thead>
-      <tbody>${rows.map(o=>`<tr><td><b>${esc(o.w.nama)}</b></td><td><span class="pill ${PC[o.w.tipe]}">${TIPE[o.w.tipe]}</span></td><td class="r">${num(o.hari)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bN)}</td><td class="r">${rp(o.bL)}</td><td class="r">${o.kas?'−'+rp(o.kas):'–'}</td><td class="r big">${rp(o.bN+o.bL-o.kas)}</td></tr>`).join('')}</tbody>
+      <tbody>${rows.map(o=>`<tr><td><b>${esc(o.w.nama)}</b></td><td><span class="pill ${PC[o.w.tipe]}">${grupNama(o.w)}</span></td><td class="r">${num(o.hari)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bN)}</td><td class="r">${rp(o.bL)}</td><td class="r">${o.kas?'−'+rp(o.kas):'–'}</td><td class="r big">${rp(o.bN+o.bL-o.kas)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="2">Total</td><td class="r">${num(T.hari)}</td><td class="r">${num(T.lem/60)}</td><td class="r">${rp(T.bN)}</td><td class="r">${rp(T.bL)}</td><td class="r">${T.kas?'−'+rp(T.kas):'–'}</td><td class="r big">${rp(net)}</td></tr></tfoot>
     </table>
     <div class="small muted">Slip tiap pekerja ada di halaman berikutnya. Dibuat ${jamEdit(Date.now())} oleh ${esc(UI.user)} · NW28 Absensi · Natawira Dwi Ashta</div>
@@ -634,7 +638,7 @@ function vGaji(){
   for(const o of rows){
     for(const k in T)T[k]+=o[k];
     const open=UI.buka.has(o.w.id);
-    body+=`<tr class="klik" data-act="buka" data-id="${o.w.id}"><td class="ck"><input type="checkbox" id="sl${o.w.id}" data-k="slip" data-id="${o.w.id}"${UI.slip.has(o.w.id)?' checked':''} aria-label="Pilih ${esc(o.w.nama)} untuk PDF"></td><td><b>${esc(o.w.nama)}</b> <span class="muted small">${open?'▾':'▸'}</span></td><td><span class="pill ${PC[o.w.tipe]}">${TIPE[o.w.tipe]}</span></td>
+    body+=`<tr class="klik" data-act="buka" data-id="${o.w.id}"><td class="ck"><input type="checkbox" id="sl${o.w.id}" data-k="slip" data-id="${o.w.id}"${UI.slip.has(o.w.id)?' checked':''} aria-label="Pilih ${esc(o.w.nama)} untuk PDF"></td><td><b>${esc(o.w.nama)}</b> <span class="muted small">${open?'▾':'▸'}</span></td><td><span class="pill ${PC[o.w.tipe]}">${grupNama(o.w)}</span></td>
       <td class="r">${num(o.hari)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bN)}</td><td class="r">${rp(o.bL)}</td><td class="r">${o.kas?'−'+rp(o.kas):'–'}</td><td class="r big">${rp(o.bN+o.bL-o.kas)}</td></tr>`;
     if(open){
       body+=`<tr class="detail"><td colspan="9"><div class="det-wrap"><div class="detail-list grow">${rincian(o)||'<span class="muted">Hanya kasbon di periode ini.</span>'}</div><button class="btn pri" data-act="pdf" data-id="${o.w.id}">Unduh PDF slip</button></div></td></tr>`;
@@ -686,7 +690,7 @@ function vProyek(){
     const det=[...o.det].sort((a,b)=>a.tgl<b.tgl?-1:a.tgl>b.tgl?1:a.w.nama.localeCompare(b.w.nama)||a.x.s.a-b.x.s.a);
     let last='';
     const rows=det.map(d=>{const x=d.x,tg=d.tgl!==last?`<b>${tglPendek(d.tgl)}</b>`:'';last=d.tgl;return `<tr>
-      <td>${tg}</td><td>${esc(d.w.nama)} <span class="pill ${PC[d.w.tipe]}">${TIPE[d.w.tipe]}</span></td>
+      <td>${tg}</td><td>${esc(d.w.nama)} <span class="pill ${PC[d.w.tipe]}">${grupNama(d.w)}</span></td>
       <td class="num">${jamTxt(x)}</td>
       <td class="r">${x.bobot?num(x.bobot):'–'}</td><td class="r">${x.bobot?rp(x.bN):'–'}</td>
       <td class="r">${x.lem?num(x.lem/60)+(d.dobel?' (2×)':''):'–'}</td><td class="r">${x.lem?rp(x.bL):'–'}</td>
@@ -739,7 +743,7 @@ function vProyek(){
 function vPekerja(){
   const rows=S.workers.map(w=>`<tr>
     <td><input type="text" id="w${w.id}n" data-k="w" data-id="${w.id}" data-f="nama" value="${esc(w.nama)}" aria-label="Nama" style="width:150px">${ed('w|'+w.id)}</td>
-    <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="tipe" aria-label="Tipe">${opsiTipe(w.tipe)}</select></td>
+    <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="grup" aria-label="Grup">${opsiGrup(w.grup?'g'+w.grup:w.tipe,true)}</select></td>
     <td><input type="number" id="w${w.id}u" min="0" step="5000" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="upah" value="${w.upah}" aria-label="Upah harian"></td>
     <td class="num">${w.tipe==='event'?'<span class="muted">–</span>':`${rp(w.upah/divOf(w.tipe))}<span class="edited" style="display:block">upah harian ÷ ${divOf(w.tipe)}</span>`}</td>
     <td><input type="number" id="w${w.id}l" min="0" step="500" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="lembur" value="${w.lembur}"${w.tipe==='event'?' disabled':''} aria-label="Tarif lembur per jam"></td>
@@ -747,14 +751,20 @@ function vPekerja(){
     <td><button class="x" data-act="del-w" data-id="${w.id}" aria-label="Hapus pekerja">×</button></td></tr>`).join('');
   return `<div><div class="label">Master data</div><h2 style="font-size:24px">Pekerja</h2></div>
   <section class="panel">
-    <div class="tbl"><table><thead><tr><th>Nama</th><th>Tipe</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Nama</th><th>Grup</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="small muted">Upah dan tarif lembur diisi manual per orang. Semua hitungan di tab lain mengikuti otomatis.</p>
+  </section>
+  <section class="panel kartu">
+    <h3>Grup tukang</h3>
+    <p class="small muted" style="margin:0">Grup bawaan: Workshop NW28, Tim Garut, dan Event. Grup baru memakai aturan upah salah satu grup bawaan, dan namanya tampil di absensi, gaji, proyek, serta PDF.</p>
+    ${(S.grup||[]).map(g=>{const n=S.workers.filter(w=>w.grup===g.id).length;return `<div class="blok"><span class="pill ${PC[g.aturan]}">${esc(g.nama)}</span><input type="text" id="g${g.id}n" class="grow" data-k="g" data-id="${g.id}" data-f="nama" value="${esc(g.nama)}" aria-label="Nama grup"><label class="tarif">Aturan <select id="g${g.id}a" data-k="g" data-id="${g.id}" data-f="aturan">${opsiTipe(g.aturan)}</select></label><span class="small muted">${n} pekerja</span>${ed('g|'+g.id)}<button class="x" data-act="del-grup" data-id="${g.id}" aria-label="Hapus grup">×</button></div>`}).join('')}
+    <div class="row"><input type="text" id="ng-n" class="grow" placeholder="Nama grup baru, misal Tim Cikarang" aria-label="Nama grup baru"><label class="row small">Pakai aturan <select id="ng-a" aria-label="Aturan grup baru">${opsiTipe('workshop')}</select></label><button class="btn pri" data-act="add-grup">+ Tambah grup</button></div>
   </section>
   <section class="panel kartu">
     <h3>Tambah pekerja</h3>
     <div class="row">
       <input type="text" id="nw-n" class="grow" placeholder="Nama" aria-label="Nama pekerja baru">
-      <select id="nw-t" aria-label="Tipe">${opsiTipe('workshop')}</select>
+      <select id="nw-t" aria-label="Grup">${opsiGrup(UI.nwGrup||'workshop')}</select>
       <input type="number" id="nw-u" min="0" step="5000" inputmode="numeric" placeholder="Upah harian" aria-label="Upah harian">
       <input type="number" id="nw-l" min="0" step="500" inputmode="numeric" placeholder="Lembur/jam" aria-label="Tarif lembur per jam">
       <button class="btn pri" data-act="add-w">+ Tambah</button>
@@ -874,7 +884,7 @@ document.addEventListener('click',e=>{
     case 'del-kas':catat('Menghapus kasbon');S.kasbon=S.kasbon.filter(k=>k.id!==id);break;
     case 'salin-rekap':{
       const L=[['Pekerja','Tipe','Hari','Jam lembur','Upah normal','Upah lembur','Kasbon','Diterima'].join('\t')];
-      for(const o of dataGaji())L.push([o.w.nama,TIPE[o.w.tipe],num(o.hari),num(o.lem/60),Math.round(o.bN),Math.round(o.bL),Math.round(o.kas),Math.round(o.bN+o.bL-o.kas)].join('\t'));
+      for(const o of dataGaji())L.push([o.w.nama,grupNama(o.w),num(o.hari),num(o.lem/60),Math.round(o.bN),Math.round(o.bL),Math.round(o.kas),Math.round(o.bN+o.bL-o.kas)].join('\t'));
       const txt=`Rekap gaji ${UI.dari} s.d. ${UI.sampai}\n`+L.join('\n');
       const gagal=()=>{UI.salin=txt;render();const b=document.getElementById('salin-box');if(b){b.focus();b.select()}};
       try{navigator.clipboard.writeText(txt).then(()=>toast('Rekap disalin'),gagal)}catch(err){gagal()}
@@ -885,10 +895,17 @@ document.addEventListener('click',e=>{
     case 'del-proj':
       if(S.segs.some(s=>s.pid===id)||S.kasbon.some(k=>k.pid===id)){toast('Proyek ini sudah punya absensi atau kasbon. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus proyek');S.projects=S.projects.filter(p=>p.id!==id);break;
+    case 'add-grup':{
+      const n=document.getElementById('ng-n').value.trim();if(!n){toast('Isi nama grup');return}
+      const gid=nid();stamp('g|'+gid,'Grup '+n);(S.grup=S.grup||[]).push({id:gid,nama:n,aturan:document.getElementById('ng-a').value});
+      UI.nwGrup='g'+gid;toast(`Grup ${n} ditambahkan dan sudah terpilih di form tambah pekerja.`);break}
+    case 'del-grup':
+      if(S.workers.some(w=>w.grup===id)){toast('Grup ini masih dipakai pekerja. Pindahkan pekerjanya ke grup lain dulu.');return}
+      catat('Menghapus grup');S.grup=(S.grup||[]).filter(g=>g.id!==id);if(UI.nwGrup==='g'+id)UI.nwGrup='';break;
     case 'add-w':{
       const n=document.getElementById('nw-n').value.trim(),u=+document.getElementById('nw-u').value,l=+document.getElementById('nw-l').value;
       if(!n||!(u>0)){toast('Isi nama dan upah harian');return}
-      const wid=nid();stamp('w|'+wid,'Pekerja '+n);S.workers.push({id:wid,nama:n,tipe:document.getElementById('nw-t').value,upah:u,lembur:l>0?l:0,aktif:true});break}
+      const wid=nid();stamp('w|'+wid,'Pekerja '+n);const nw={id:wid,nama:n,tipe:'workshop',grup:null,upah:u,lembur:l>0?l:0,aktif:true};UI.nwGrup=document.getElementById('nw-t').value;setGrup(nw,UI.nwGrup);S.workers.push(nw);break}
     case 'del-w':
       if(S.segs.some(s=>s.wid===id)||S.kasbon.some(k=>k.wid===id)){toast('Pekerja ini sudah punya absensi. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus pekerja');S.workers=S.workers.filter(w=>w.id!==id);break;
@@ -904,11 +921,12 @@ document.addEventListener('change',e=>{
   const t=e.target,k=t.dataset.k;if(!k)return;
   const id=+t.dataset.id,f=t.dataset.f,v=t.type==='checkbox'?t.checked:t.value;
   if(k==='seg'){const s=S.segs.find(x=>x.id===id);if(!s)return;abs(s.wid,s.tgl);if(f==='tarif')s.tarif=v===''?null:Math.max(0,+v||0);else if(f==='hari')s.hari=Math.max(1,Math.round(+v)||1);else s[f]=+v}
-  else if(k==='w'){const w=W(id);stamp('w|'+id,'Pekerja '+w.nama);if(f==='nama')w.nama=v.trim()||w.nama;else if(f==='tipe'||f==='aktif')w[f]=v;else w[f]=Math.max(0,+v||0)}
+  else if(k==='w'){const w=W(id);stamp('w|'+id,'Pekerja '+w.nama);if(f==='nama')w.nama=v.trim()||w.nama;else if(f==='grup')setGrup(w,v);else if(f==='tipe'||f==='aktif')w[f]=v;else w[f]=Math.max(0,+v||0)}
   else if(k==='p'){const p=P(id);stamp('p|'+id,'Proyek '+p.nama);if(f==='nama')p.nama=v.trim()||p.nama;else p[f]=v}
   else if(k==='r'){const r=S.rules[t.dataset.tipe];stamp('r|'+t.dataset.tipe,'Aturan '+TIPE[t.dataset.tipe]);
     if(f==='ist')r.ist[+t.dataset.i][+t.dataset.j]=+v;else if(f==='dobel')r.dobel=v;else if(f==='ganti')r.ganti=v==='1';else r[f]=+v;
     if(r.selesai<=r.mulai)toast('Jam selesai normal harus setelah jam mulai')}
+  else if(k==='g'){const g=GR(id);if(!g)return;stamp('g|'+id,'Grup '+g.nama);if(f==='nama')g.nama=v.trim()||g.nama;else{g.aturan=v;for(const w of S.workers)if(w.grup===id)w.tipe=v}}
   else if(k==='kas'){const x=S.kasbon.find(q=>q.id===id);if(!x)return;x.pid=+v||null;stamp('k|'+id,'Kasbon '+((W(x.wid)||{}).nama||''))}
   else if(k==='ui'){if(!v)return;UI[f]=v;if(f==='tgl')UI.pilih.clear();if(UI.dari>UI.sampai){if(f==='dari')UI.sampai=v;else UI.dari=v}render();return}
   else if(k==='prj'){v?UI.prj.add(id):UI.prj.delete(id);render();return}
