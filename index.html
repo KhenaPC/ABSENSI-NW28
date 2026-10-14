@@ -294,8 +294,8 @@ const fclear=(...ids)=>{if(UI.form)for(const i of ids)delete UI.form[i]};
 for(const ev of ['input','change'])document.addEventListener(ev,e=>{const t=e.target;if(t&&FORM.includes(t.id)){UI.form=UI.form||{};UI.form[t.id]=t.value}},true);
 const GR=id=>(S.grup||[]).find(g=>g.id===id);
 const grupNama=w=>{const g=w.grup&&GR(w.grup);return g?g.nama:TIPE[w.tipe]};
-const setGrup=(w,v)=>{if(v[0]==='g'){const g=GR(+v.slice(1));if(g){w.grup=g.id;w.tipe=g.aturan}}else{w.grup=null;w.tipe=v}};
-const opsiGrup=(v,pendek)=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('')+(S.grup||[]).map(g=>`<option value="g${g.id}"${'g'+g.id===v?' selected':''}>${esc(g.nama)}${pendek?'':` (aturan ${TIPE[g.aturan]})`}</option>`).join('');
+const setGrup=(w,v)=>{if(v.startsWith('grp:')){const g=GR(+v.slice(4));if(g){w.grup=g.id;w.tipe=g.aturan}}else{w.grup=null;w.tipe=v}};
+const opsiGrup=(v,pendek)=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('')+(S.grup||[]).map(g=>`<option value="grp:${g.id}"${'grp:'+g.id===v?' selected':''}>${esc(g.nama)}${pendek?'':` (aturan ${TIPE[g.aturan]})`}</option>`).join('');
 const opsiTipe=v=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('');
 const jamTxt=x=>x.argo?`${hm(x.s.a)} + ${x.argo}×24 jam`:`${hm(x.s.a)}–${hm(x.s.b)}`;
 const WARNA=['#2F6BFF','#12A594','#E0338B','#E5A800','#8B5CF6','#FF7A1A','#3FAE3A','#E5484D'];
@@ -747,7 +747,7 @@ function vProyek(){
 function vPekerja(){
   const rows=S.workers.map(w=>`<tr>
     <td><input type="text" id="w${w.id}n" data-k="w" data-id="${w.id}" data-f="nama" value="${esc(w.nama)}" aria-label="Nama" style="width:150px">${ed('w|'+w.id)}</td>
-    <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="grup" aria-label="Grup">${opsiGrup(w.grup?'g'+w.grup:w.tipe,true)}</select></td>
+    <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="grup" aria-label="Grup">${opsiGrup(w.grup?'grp:'+w.grup:w.tipe,true)}</select></td>
     <td><input type="number" id="w${w.id}u" min="0" step="5000" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="upah" value="${w.upah}" aria-label="Upah harian"></td>
     <td class="num">${w.tipe==='event'?'<span class="muted">–</span>':`${rp(w.upah/divOf(w.tipe))}<span class="edited" style="display:block">upah harian ÷ ${divOf(w.tipe)}</span>`}</td>
     <td><input type="number" id="w${w.id}l" min="0" step="500" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="lembur" value="${w.lembur}"${w.tipe==='event'?' disabled':''} aria-label="Tarif lembur per jam"></td>
@@ -902,10 +902,10 @@ document.addEventListener('click',e=>{
     case 'add-grup':{
       const n=document.getElementById('ng-n').value.trim();if(!n){toast('Isi nama grup');return}
       const gid=nid();stamp('g|'+gid,'Grup '+n);(S.grup=S.grup||[]).push({id:gid,nama:n,aturan:document.getElementById('ng-a').value});
-      UI.nwGrup='g'+gid;UI.form=UI.form||{};UI.form['nw-t']=UI.nwGrup;fclear('ng-n');toast(`Grup ${n} ditambahkan dan sudah terpilih di form tambah pekerja.`);break}
+      UI.nwGrup='grp:'+gid;UI.form=UI.form||{};UI.form['nw-t']=UI.nwGrup;fclear('ng-n');toast(`Grup ${n} ditambahkan dan sudah terpilih di form tambah pekerja.`);break}
     case 'del-grup':
       if(S.workers.some(w=>w.grup===id)){toast('Grup ini masih dipakai pekerja. Pindahkan pekerjanya ke grup lain dulu.');return}
-      catat('Menghapus grup');S.grup=(S.grup||[]).filter(g=>g.id!==id);if(UI.nwGrup==='g'+id)UI.nwGrup='';break;
+      catat('Menghapus grup');S.grup=(S.grup||[]).filter(g=>g.id!==id);if(UI.nwGrup==='grp:'+id)UI.nwGrup='';break;
     case 'add-w':{
       const n=document.getElementById('nw-n').value.trim(),u=+document.getElementById('nw-u').value,l=+document.getElementById('nw-l').value;
       if(!n||!(u>0)){toast('Isi nama dan upah harian');return}
