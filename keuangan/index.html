@@ -542,55 +542,104 @@ async function buatXlsxTrx(L){
   tr.getCell(1).value=`Total (${list.length} transaksi)`;tr.getCell(9).value={formula:`SUM(I5:I${akhir})`,result:hs.m};tr.getCell(10).value={formula:`SUM(J5:J${akhir})`,result:hs.k};
   for(let i=1;i<=12;i++){const c=tr.getCell(i);c.font={bold:true,size:10,color:{argb:INK}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:SOFT}};c.border={top:{style:'medium',color:{argb:NAVY}}}}
   tr.getCell(9).numFmt=RP;tr.getCell(10).numFmt=RP;tr.height=22;
-  /* sheet 2: laporan untuk klien (cost & fee) */
-  const ids=[...new Set(list.map(t=>t.proyek))],pj=ids.length===1?P(ids[0]):null,biaya=list.filter(t=>t.jenis==='keluar').sort((a,b)=>a.tanggal.localeCompare(b.tanggal)||(a.pada||0)-(b.pada||0)),terima=list.filter(t=>t.jenis==='masuk').sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
-  const fee=pj&&+pj.fee>0?+pj.fee/100:0.1,tg=list.map(t=>t.tanggal).sort();
+  ws.protect('',{selectLockedCells:true,selectUnlockedCells:true,formatColumns:true,formatRows:true});
+  ws.getCell('A3').value='Data asli dari aplikasi. Sheet ini dikunci supaya tidak berubah tanpa sengaja (Review → Unprotect Sheet kalau perlu).';ws.getCell('A3').font={size:9,italic:true,color:{argb:MUT}};
+  /* sheet 2: transaksi klien, salinan yang bebas diedit */
+  wb.calcProperties.fullCalcOnLoad=true;
+  const ids=[...new Set(list.map(t=>t.proyek))],pj=ids.length===1?P(ids[0]):null,fee=pj&&+pj.fee>0?+pj.fee/100:0.1;
+  const urut=[...list].sort((a,b)=>a.tanggal.localeCompare(b.tanggal)||(a.pada||0)-(b.pada||0)),CAD=50,N2=urut.length+CAD,A2=5,Z2=A2+N2-1,SN="'Transaksi Klien'";
+  const tglX=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(Date.UTC(y,m-1,d))},TGL='d mmm yyyy';
+  const w2=wb.addWorksheet('Transaksi Klien',{views:[{state:'frozen',ySplit:4}],pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  const kol3=[['Tanggal',13],['Keterangan',36],['Vendor / pihak',24],['Proyek',20],['Kategori',18],['Masuk (Rp)',16],['Keluar (Rp)',16],['Tampilkan ke klien',13],['Foto bukti',12],['No biaya',7],['No bayar',7]];
+  w2.columns=kol3.map(([,w],i)=>({width:w,hidden:i>=9}));
+  w2.getCell('A1').value='Transaksi Klien · bahan laporan';w2.getCell('A1').font={bold:true,size:14,color:{argb:NAVY}};
+  w2.getCell('A2').value='Ubah tanggal, keterangan, kategori, atau angka di sheet ini. Semua perubahan langsung masuk ke sheet Laporan Klien.';w2.getCell('A2').font={size:10,color:{argb:INK}};
+  w2.getCell('A3').value=`Pilih "Tidak" di kolom Tampilkan ke klien untuk menyembunyikan baris. ${CAD} baris kosong di bawah bisa diisi transaksi tambahan.`;w2.getCell('A3').font={size:9,italic:true,color:{argb:MUT}};
+  const h2=w2.getRow(4);kol3.forEach(([h],i)=>{const c=h2.getCell(i+1);c.value=h;kepala(c);if(i===5||i===6)c.alignment={horizontal:'right',vertical:'middle',wrapText:true};if(i===7)c.alignment={horizontal:'center',vertical:'middle',wrapText:true}});h2.height=30;
+  let nb=0,np=0;const noB={},noP={};
+  for(let i=0;i<N2;i++){
+    const r=A2+i,t=urut[i],row=w2.getRow(r);
+    if(t){const m=t.jenis==='masuk';row.getCell(1).value=tglX(t.tanggal);row.getCell(2).value=t.ket||'';row.getCell(3).value=t.pihak||'';row.getCell(4).value=namaP(t.proyek);row.getCell(5).value=t.kategori||'';
+      if(m)row.getCell(6).value=t.nominal;else row.getCell(7).value=t.nominal;row.getCell(8).value='Ya';if(m){np++;noP[np]=t}else{nb++;noB[nb]=t}}
+    row.getCell(10).value={formula:`IF(AND(H${r}<>"Tidak",N(G${r})>0),COUNTIFS(H$${A2}:H${r},"<>Tidak",G$${A2}:G${r},">0"),"")`,result:t&&t.jenis!=='masuk'?nb:''};
+    row.getCell(11).value={formula:`IF(AND(H${r}<>"Tidak",N(F${r})>0),COUNTIFS(H$${A2}:H${r},"<>Tidak",F$${A2}:F${r},">0"),"")`,result:t&&t.jenis==='masuk'?np:''};
+    for(let c=1;c<=9;c++){const x=row.getCell(c);x.font={size:10,color:{argb:INK}};x.alignment={vertical:'middle',wrapText:c===2||c===3};x.border=garis;if(!t)x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFBFCFE'}}}
+    row.getCell(1).numFmt=TGL;row.getCell(6).numFmt=RP;row.getCell(7).numFmt=RP;row.getCell(8).alignment={horizontal:'center',vertical:'middle'};
+    row.getCell(8).dataValidation={type:'list',allowBlank:true,formulae:['"Ya,Tidak"']};
+    row.getCell(5).dataValidation={type:'list',allowBlank:true,showErrorMessage:false,formulae:[`"${[...new Set([...KAT.keluar,...KAT.masuk])].join(',')}"`]};
+    const fp=t&&foto[t.id];
+    if(fp){const id=wb.addImage({base64:fp.b64,extension:'jpeg'});w2.addImage(id,{tl:{col:8+(84-fp.w)/2/84,row:r-1+0.06},ext:{width:fp.w,height:fp.h},editAs:'oneCell'});row.height=Math.max(30,fp.h*0.75+8)}
+  }
+  const tr2=w2.getRow(Z2+1);tr2.getCell(1).value='Total';tr2.getCell(6).value={formula:`SUMIFS(F${A2}:F${Z2},H${A2}:H${Z2},"<>Tidak")`,result:hitung(list).m};tr2.getCell(7).value={formula:`SUMIFS(G${A2}:G${Z2},H${A2}:H${Z2},"<>Tidak")`,result:hitung(list).k};
+  for(let i=1;i<=9;i++){const c=tr2.getCell(i);c.font={bold:true,size:10,color:{argb:INK}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:SOFT}};c.border={top:{style:'medium',color:{argb:NAVY}}}}
+  tr2.getCell(6).numFmt=RP;tr2.getCell(7).numFmt=RP;
+  /* sheet 3: laporan klien, seluruhnya rumus dari sheet 2 */
+  const RNG=c=>`${SN}!$${c}$${A2}:$${c}$${Z2}`,tot=hitung(list).k,dib=hitung(list).m;
   const wk=wb.addWorksheet('Laporan Klien',{views:[{showGridLines:false}],pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:.5,right:.5,top:.6,bottom:.6,header:.3,footer:.3}}});
   wk.columns=[{width:5},{width:13},{width:40},{width:20},{width:24},{width:18}];
   const tulis=(ref,v,f)=>{const c=wk.getCell(ref);c.value=v;if(f)c.font=f;return c};
   tulis('A1','NW28 · Natawira Dwi Ashta',{bold:true,size:16,color:{argb:NAVY}});
   tulis('A2','Laporan Biaya Proyek · Kerja Sama Cost & Fee',{size:11,color:{argb:MUT}});
   wk.getRow(3).height=6;for(let i=1;i<=6;i++)wk.getRow(3).getCell(i).border={bottom:{style:'medium',color:{argb:NAVY}}};
-  const info=[['Proyek',pj?pj.nama:(ids.length?ids.map(namaP).join(', '):'-')],['Klien',pj&&pj.klien?pj.klien:'-'],['Periode',tg.length?tgl(tg[0])+' – '+tgl(tg[tg.length-1]):'-'],['Tanggal laporan',tgl(hariIni())]];
-  info.forEach(([k,v],i)=>{tulis('A'+(5+i),k,{size:10,color:{argb:MUT}});wk.mergeCells(`A${5+i}:B${5+i}`);tulis('C'+(5+i),v,{bold:true,size:10,color:{argb:INK}})});
-  const H=10,kol2=['No','Tanggal','Uraian pekerjaan / pembelian','Kategori','Vendor','Biaya'];
-  const hr2=wk.getRow(H);kol2.forEach((h,i)=>{const c=hr2.getCell(i+1);c.value=h;kepala(c);c.alignment={vertical:'middle',horizontal:i===5?'right':i===0?'center':'left'}});hr2.height=22;
-  let q=H+1;
-  biaya.forEach((t,i)=>{const row=wk.getRow(q);row.values=[i+1,tgl(t.tanggal),t.ket||'-',t.kategori||'',t.pihak||''];row.getCell(6).value=t.nominal;
-    for(let c=1;c<=6;c++){const x=row.getCell(c);x.font={size:10,color:{argb:INK}};x.border=garis;x.alignment={vertical:'middle',wrapText:c===3||c===5,horizontal:c===1?'center':undefined}}
-    row.getCell(6).numFmt=RP;row.getCell(1).font={size:9,color:{argb:MUT}};q++});
-  const awal=H+1,akh=Math.max(awal,q-1),tot=biaya.reduce((a,t)=>a+t.nominal,0),dib=terima.reduce((a,t)=>a+t.nominal,0);
-  const sub=wk.getRow(q);sub.getCell(3).value='Total biaya proyek';sub.getCell(6).value={formula:`SUM(F${awal}:F${akh})`,result:tot};
-  for(let c=1;c<=6;c++){const x=sub.getCell(c);x.font={bold:true,size:10,color:{argb:INK}};x.border={top:{style:'thin',color:{argb:NAVY}}}}sub.getCell(6).numFmt=RP;sub.height=20;
-  const rT=q;q+=2;
-  const rk=(label,val,opt={})=>{const row=wk.getRow(q);row.getCell(4).value=label;wk.mergeCells(`D${q}:E${q}`);const v=row.getCell(6);v.value=val;v.numFmt=opt.fmt||RP;
+  const tg=urut.map(t=>t.tanggal);
+  [['Proyek',pj?pj.nama:(ids.length?ids.map(namaP).join(', '):'-')],['Klien',pj&&pj.klien?pj.klien:'-'],['Tanggal laporan',tgl(hariIni())]].forEach(([k,v],i)=>{tulis('A'+(5+i),k,{size:10,color:{argb:MUT}});wk.mergeCells(`A${5+i}:B${5+i}`);tulis('C'+(5+i),v,{bold:true,size:10,color:{argb:INK}})});
+  tulis('A8','Periode',{size:10,color:{argb:MUT}});wk.mergeCells('A8:B8');
+  const pa=wk.getCell('C8');pa.value={formula:`MIN(${RNG('A')})`,result:tg.length?tglX(tg[0]):''};pa.numFmt='d mmm yyyy'+'" s.d."';pa.font={bold:true,size:10,color:{argb:INK}};pa.alignment={horizontal:'left'};
+  const pb=wk.getCell('D8');pb.value={formula:`MAX(${RNG('A')})`,result:tg.length?tglX(tg[tg.length-1]):''};pb.numFmt=TGL;pb.font={bold:true,size:10,color:{argb:INK}};pb.alignment={horizontal:'left'};
+  let q=10;
+  const judul=(ref,t)=>tulis(ref,t,{bold:true,size:11,color:{argb:NAVY}});
+  judul('D'+q,'Ringkasan tagihan');q++;
+  const rk=(label,val,opt={})=>{const row=wk.getRow(q);row.getCell(4).value=label;wk.mergeCells(`D${q}:E${q}`);const v=row.getCell(6);v.value=val;v.numFmt=RP;
     row.getCell(4).font={size:10,bold:!!opt.bold,color:{argb:opt.putih?'FFFFFFFF':INK}};v.font={size:opt.besar?12:10,bold:!!opt.bold,color:{argb:opt.putih?'FFFFFFFF':INK}};
     if(opt.isi)[4,5,6].forEach(c=>row.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:opt.isi}});row.getCell(4).alignment={vertical:'middle'};v.alignment={vertical:'middle'};row.height=opt.besar?24:19;return q++};
-  tulis('D'+q,'Ringkasan tagihan',{bold:true,size:11,color:{argb:NAVY}});q++;
-  const rB=rk('Total biaya proyek (cost)',{formula:`F${rT}`,result:tot});
+  const rB=rk('Total biaya proyek (cost)',{formula:`SUMIFS(${RNG('G')},${RNG('H')},"<>Tidak")`,result:tot});
   const rowF=wk.getRow(q);rowF.getCell(4).value='Persentase fee';rowF.getCell(4).font={size:10,color:{argb:INK}};const pc=rowF.getCell(5);pc.value=fee;pc.numFmt='0.0%';pc.font={bold:true,size:10,color:{argb:INK}};pc.fill={type:'pattern',pattern:'solid',fgColor:{argb:KUNING}};pc.alignment={horizontal:'center'};pc.note='Ubah persen fee di sel ini sesuai kontrak. Semua angka di bawahnya ikut berubah.';const rP=q;rowF.height=19;q++;
   const rFe=rk('Fee jasa',{formula:`ROUND(F${rB}*E${rP},0)`,result:Math.round(tot*fee)});
   const rN=rk('Total nilai pekerjaan',{formula:`F${rB}+F${rFe}`,result:tot+Math.round(tot*fee)},{bold:true,isi:SOFT});
-  const rD=rk('Sudah dibayar klien',{formula:terima.length?`SUM(F${0}:F${0})`:'0',result:dib});
+  const rD=rk('Sudah dibayar klien',{formula:`SUMIFS(${RNG('F')},${RNG('H')},"<>Tidak")`,result:dib});
   rk('Sisa tagihan',{formula:`F${rN}-F${rD}`,result:tot+Math.round(tot*fee)-dib},{bold:true,isi:NAVY,putih:true,besar:true});
   q+=1;
   /* rincian per kategori */
-  tulis('B'+q,'Rincian per kategori',{bold:true,size:11,color:{argb:NAVY}});q++;
-  const hk=wk.getRow(q);[['B','Kategori'],['D','Jumlah item'],['F','Biaya']].forEach(([c,h])=>{const x=hk.getCell(c);x.value=h;x.font={bold:true,size:10,color:{argb:MUT}};x.border={bottom:{style:'thin',color:{argb:NAVY}}};if(c==='F')x.alignment={horizontal:'right'}});wk.mergeCells(`B${q}:C${q}`);q++;
-  const kats={};biaya.forEach(t=>{const k=t.kategori||'Lainnya';kats[k]=kats[k]||{n:0,v:0};kats[k].n++;kats[k].v+=t.nominal});
+  judul('B'+q,'Rincian per kategori');q++;
+  const subjudul=(cols)=>{const hr=wk.getRow(q);cols.forEach(([c,h,kanan])=>{const x=hr.getCell(c);x.value=h;x.font={bold:true,size:10,color:{argb:MUT}};x.border={bottom:{style:'thin',color:{argb:NAVY}}};if(kanan)x.alignment={horizontal:'right'}});q++};
+  subjudul([['B','Kategori'],['C',''],['D','Jumlah item'],['E',''],['F','Biaya',1]]);
+  const kats={};urut.filter(t=>t.jenis!=='masuk').forEach(t=>{const k=t.kategori||'Lainnya';kats[k]=kats[k]||{n:0,v:0};kats[k].n++;kats[k].v+=t.nominal});
   Object.entries(kats).sort((a,b)=>b[1].v-a[1].v).forEach(([k,o])=>{const row=wk.getRow(q);row.getCell(2).value=k;wk.mergeCells(`B${q}:C${q}`);
-    row.getCell(4).value={formula:`COUNTIF(D$${awal}:D$${akh},B${q})`,result:o.n};row.getCell(6).value={formula:`SUMIF(D$${awal}:D$${akh},B${q},F$${awal}:F$${akh})`,result:o.v};row.getCell(6).numFmt=RP;
+    row.getCell(4).value={formula:`COUNTIFS(${RNG('E')},B${q},${RNG('H')},"<>Tidak",${RNG('G')},">0")`,result:o.n};
+    row.getCell(6).value={formula:`SUMIFS(${RNG('G')},${RNG('E')},B${q},${RNG('H')},"<>Tidak")`,result:o.v};row.getCell(6).numFmt=RP;
     [2,4,6].forEach(c=>{row.getCell(c).font={size:10,color:{argb:INK}};row.getCell(c).border=garis});row.getCell(4).alignment={horizontal:'center'};q++});
+  const rKat=wk.getRow(q);rKat.getCell(2).value='Kategori lain (di luar daftar di atas)';wk.mergeCells(`B${q}:C${q}`);
+  rKat.getCell(6).value={formula:`F${rB}-SUM(F${q-Object.keys(kats).length}:F${q-1})`,result:0};rKat.getCell(6).numFmt='"Rp" #,##0;-"Rp" #,##0;"–"';[2,6].forEach(c=>{rKat.getCell(c).font={size:9,italic:true,color:{argb:MUT}}});q+=2;
+  /* pembayaran dari klien (mengikuti sheet 2) */
+  const ISI=(k,col,kunci)=>`IFERROR(INDEX(${RNG(col)},MATCH(${k},${RNG(kunci)},0)),"")`;
+  judul('B'+q,'Pembayaran dari klien');q++;
+  subjudul([['B','Tanggal'],['C','Keterangan'],['D',''],['E',''],['F','Nominal',1]]);
+  const nP=np+5;
+  for(let k=1;k<=nP;k++){const row=wk.getRow(q),t=noP[k];
+    row.getCell(2).value={formula:ISI(k,'A','K'),result:t?tglX(t.tanggal):''};row.getCell(2).numFmt='d mmm yyyy;;';
+    row.getCell(3).value={formula:`${ISI(k,'B','K')}&""`,result:t?(t.ket||''):''};wk.mergeCells(`C${q}:E${q}`);
+    row.getCell(6).value={formula:ISI(k,'F','K'),result:t?t.nominal:''};row.getCell(6).numFmt='"Rp" #,##0;-"Rp" #,##0;';
+    [2,3,6].forEach(c=>row.getCell(c).font={size:10,color:{argb:INK}});q++}
+  wk.addConditionalFormatting({ref:`B${q-nP}:F${q-1}`,rules:[{type:'expression',formulae:[`$F${q-nP}<>""`],style:{border:{bottom:{style:'thin',color:{argb:LINE}}}}}]});
   q+=1;
-  /* penerimaan dari klien */
-  tulis('B'+q,'Pembayaran dari klien',{bold:true,size:11,color:{argb:NAVY}});q++;
-  const hp=wk.getRow(q);[['B','Tanggal'],['C','Keterangan'],['F','Nominal']].forEach(([c,h])=>{const x=hp.getCell(c);x.value=h;x.font={bold:true,size:10,color:{argb:MUT}};x.border={bottom:{style:'thin',color:{argb:NAVY}}};if(c==='F')x.alignment={horizontal:'right'}});wk.mergeCells(`C${q}:E${q}`);q++;
-  const pAw=q;
-  if(terima.length)terima.forEach(t=>{const row=wk.getRow(q);row.getCell(2).value=tgl(t.tanggal);row.getCell(3).value=t.ket||t.kategori||'-';wk.mergeCells(`C${q}:E${q}`);row.getCell(6).value=t.nominal;row.getCell(6).numFmt=RP;[2,3,6].forEach(c=>{row.getCell(c).font={size:10,color:{argb:INK}};row.getCell(c).border=garis});q++});
-  else{wk.getCell('C'+q).value='Belum ada pembayaran tercatat';wk.getCell('C'+q).font={size:10,italic:true,color:{argb:MUT}};q++}
-  if(terima.length)wk.getCell('F'+rD).value={formula:`SUM(F${pAw}:F${q-1})`,result:dib};
-  q+=1;
+  /* rincian biaya (mengikuti sheet 2) */
+  judul('A'+q,'Rincian biaya');q++;
+  const hr3=wk.getRow(q);['No','Tanggal','Uraian pekerjaan / pembelian','Kategori','Vendor','Biaya'].forEach((h,i)=>{const c=hr3.getCell(i+1);c.value=h;kepala(c);c.alignment={vertical:'middle',horizontal:i===5?'right':i===0?'center':'left'}});hr3.height=22;q++;
+  const nB=nb+15,awal=q;
+  for(let k=1;k<=nB;k++){const row=wk.getRow(q),t=noB[k];
+    row.getCell(1).value={formula:`IF(ISNUMBER(MATCH(${k},${RNG('J')},0)),${k},"")`,result:t?k:''};
+    row.getCell(2).value={formula:ISI(k,'A','J'),result:t?tglX(t.tanggal):''};row.getCell(2).numFmt='d mmm yyyy;;';
+    row.getCell(3).value={formula:`${ISI(k,'B','J')}&""`,result:t?(t.ket||''):''};
+    row.getCell(4).value={formula:`${ISI(k,'E','J')}&""`,result:t?(t.kategori||''):''};
+    row.getCell(5).value={formula:`${ISI(k,'C','J')}&""`,result:t?(t.pihak||''):''};
+    row.getCell(6).value={formula:ISI(k,'G','J'),result:t?t.nominal:''};row.getCell(6).numFmt='"Rp" #,##0;-"Rp" #,##0;';
+    for(let c=1;c<=6;c++){const x=row.getCell(c);x.font={size:10,color:{argb:INK}};x.alignment={vertical:'middle',wrapText:c===3||c===5,horizontal:c===1?'center':undefined}}
+    row.getCell(1).font={size:9,color:{argb:MUT}};q++}
+  wk.addConditionalFormatting({ref:`A${awal}:F${q-1}`,rules:[{type:'expression',formulae:[`$A${awal}<>""`],style:{border:{bottom:{style:'thin',color:{argb:LINE}}}}}]});
+  const tb=wk.getRow(q);tb.getCell(3).value='Total biaya proyek';tb.getCell(6).value={formula:`F${rB}`,result:tot};tb.getCell(6).numFmt=RP;
+  for(let c=1;c<=6;c++){const x=tb.getCell(c);x.font={bold:true,size:10,color:{argb:INK}};x.border={top:{style:'thin',color:{argb:NAVY}}}}q+=2;
   tulis('B'+q,'Biaya di atas adalah pengeluaran aktual proyek. Fee jasa dihitung dari total biaya proyek sesuai persentase di atas.',{size:9,italic:true,color:{argb:MUT}});
+  wb.views=[{activeTab:0}];
   return await wb.xlsx.writeBuffer();
 }
 async function unduh(fmt,btn){
