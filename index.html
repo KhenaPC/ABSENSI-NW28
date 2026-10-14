@@ -288,6 +288,10 @@ function hitung(w,list){
 const KEY='nw28-absensi-v1', T0=360, T1=1440, TMAX=1920; // blok kerja boleh sampai 08:00 hari berikutnya
 const TIPE={workshop:'Workshop NW28',garut:'Tim Garut',event:'Event'}, PC={workshop:'ws',garut:'gr',event:'ev'};
 const ARGO=()=>({mode:'argo',mulai:0,selesai:1440,ist:[]});
+const FORM=['nw-n','nw-t','nw-u','nw-l','ng-n','ng-a','np-n','kb-w','kb-p','kb-t','kb-j','kb-k'];
+const fv=(id,def='')=>UI.form&&UI.form[id]!=null?UI.form[id]:def;
+const fclear=(...ids)=>{if(UI.form)for(const i of ids)delete UI.form[i]};
+for(const ev of ['input','change'])document.addEventListener(ev,e=>{const t=e.target;if(t&&FORM.includes(t.id)){UI.form=UI.form||{};UI.form[t.id]=t.value}},true);
 const GR=id=>(S.grup||[]).find(g=>g.id===id);
 const grupNama=w=>{const g=w.grup&&GR(w.grup);return g?g.nama:TIPE[w.tipe]};
 const setGrup=(w,v)=>{if(v[0]==='g'){const g=GR(+v.slice(1));if(g){w.grup=g.id;w.tipe=g.aturan}}else{w.grup=null;w.tipe=v}};
@@ -660,11 +664,11 @@ function vGaji(){
     <h3>Kasbon</h3>
     ${kas||'<span class="muted small">Tidak ada kasbon di periode ini.</span>'}
     <div class="row">
-      <select id="kb-w" aria-label="Pekerja">${opsiPekerja(0)}</select>
-      <select id="kb-p" aria-label="Proyek kasbon"><option value="0">Tanpa proyek</option>${opsiProyek(0)}</select>
-      <input type="date" id="kb-t" value="${UI.sampai}" aria-label="Tanggal kasbon">
-      <input type="number" id="kb-j" min="0" step="10000" inputmode="numeric" placeholder="Jumlah (Rp)" aria-label="Jumlah kasbon">
-      <input type="text" id="kb-k" class="grow" placeholder="Keterangan" aria-label="Keterangan">
+      <select id="kb-w" aria-label="Pekerja">${opsiPekerja(+fv('kb-w',0))}</select>
+      <select id="kb-p" aria-label="Proyek kasbon"><option value="0">Tanpa proyek</option>${opsiProyek(+fv('kb-p',0))}</select>
+      <input type="date" id="kb-t" value="${esc(fv('kb-t',UI.sampai))}" aria-label="Tanggal kasbon">
+      <input type="number" id="kb-j" value="${esc(fv('kb-j'))}" min="0" step="10000" inputmode="numeric" placeholder="Jumlah (Rp)" aria-label="Jumlah kasbon">
+      <input type="text" id="kb-k" value="${esc(fv('kb-k'))}" class="grow" placeholder="Keterangan" aria-label="Keterangan">
       <button class="btn pri" data-act="add-kas">+ Catat kasbon</button>
     </div>
   </section>`;
@@ -735,7 +739,7 @@ function vProyek(){
   <section class="panel kartu">
     <h3>Daftar proyek</h3>
     ${master}
-    <div class="row"><input type="text" id="np-n" class="grow" placeholder="Nama proyek baru" aria-label="Nama proyek baru"><button class="btn pri" data-act="add-proj">+ Tambah proyek</button></div>
+    <div class="row"><input type="text" id="np-n" value="${esc(fv('np-n'))}" class="grow" placeholder="Nama proyek baru" aria-label="Nama proyek baru"><button class="btn pri" data-act="add-proj">+ Tambah proyek</button></div>
   </section>`;
 }
 
@@ -758,15 +762,15 @@ function vPekerja(){
     <h3>Grup tukang</h3>
     <p class="small muted" style="margin:0">Grup bawaan: Workshop NW28, Tim Garut, dan Event. Grup baru memakai aturan upah salah satu grup bawaan, dan namanya tampil di absensi, gaji, proyek, serta PDF.</p>
     ${(S.grup||[]).map(g=>{const n=S.workers.filter(w=>w.grup===g.id).length;return `<div class="blok"><span class="pill ${PC[g.aturan]}">${esc(g.nama)}</span><input type="text" id="g${g.id}n" class="grow" data-k="g" data-id="${g.id}" data-f="nama" value="${esc(g.nama)}" aria-label="Nama grup"><label class="tarif">Aturan <select id="g${g.id}a" data-k="g" data-id="${g.id}" data-f="aturan">${opsiTipe(g.aturan)}</select></label><span class="small muted">${n} pekerja</span>${ed('g|'+g.id)}<button class="x" data-act="del-grup" data-id="${g.id}" aria-label="Hapus grup">×</button></div>`}).join('')}
-    <div class="row"><input type="text" id="ng-n" class="grow" placeholder="Nama grup baru, misal Tim Cikarang" aria-label="Nama grup baru"><label class="row small">Pakai aturan <select id="ng-a" aria-label="Aturan grup baru">${opsiTipe('workshop')}</select></label><button class="btn pri" data-act="add-grup">+ Tambah grup</button></div>
+    <div class="row"><input type="text" id="ng-n" value="${esc(fv('ng-n'))}" class="grow" placeholder="Nama grup baru, misal Tim Cikarang" aria-label="Nama grup baru"><label class="row small">Pakai aturan <select id="ng-a" aria-label="Aturan grup baru">${opsiTipe(fv('ng-a','workshop'))}</select></label><button class="btn pri" data-act="add-grup">+ Tambah grup</button></div>
   </section>
   <section class="panel kartu">
     <h3>Tambah pekerja</h3>
     <div class="row">
-      <input type="text" id="nw-n" class="grow" placeholder="Nama" aria-label="Nama pekerja baru">
-      <select id="nw-t" aria-label="Grup">${opsiGrup(UI.nwGrup||'workshop')}</select>
-      <input type="number" id="nw-u" min="0" step="5000" inputmode="numeric" placeholder="Upah harian" aria-label="Upah harian">
-      <input type="number" id="nw-l" min="0" step="500" inputmode="numeric" placeholder="Lembur/jam" aria-label="Tarif lembur per jam">
+      <input type="text" id="nw-n" value="${esc(fv('nw-n'))}" class="grow" placeholder="Nama" aria-label="Nama pekerja baru">
+      <select id="nw-t" aria-label="Grup">${opsiGrup(fv('nw-t',UI.nwGrup||'workshop'))}</select>
+      <input type="number" id="nw-u" value="${esc(fv('nw-u'))}" min="0" step="5000" inputmode="numeric" placeholder="Upah harian" aria-label="Upah harian">
+      <input type="number" id="nw-l" value="${esc(fv('nw-l'))}" min="0" step="500" inputmode="numeric" placeholder="Lembur/jam" aria-label="Tarif lembur per jam">
       <button class="btn pri" data-act="add-w">+ Tambah</button>
     </div>
   </section>`;
@@ -880,7 +884,7 @@ document.addEventListener('click',e=>{
     case 'add-kas':{
       const wid=+document.getElementById('kb-w').value,j=+document.getElementById('kb-j').value,tg=document.getElementById('kb-t').value;
       if(!wid||!tg||!(j>0)){toast('Isi pekerja, tanggal, dan jumlah kasbon');return}
-      const kid=nid();stamp('k|'+kid,'Kasbon '+W(wid).nama);S.kasbon.push({id:kid,tgl:tg,wid,pid:+document.getElementById('kb-p').value||null,jumlah:j,ket:document.getElementById('kb-k').value.trim()});break}
+      const kid=nid();stamp('k|'+kid,'Kasbon '+W(wid).nama);S.kasbon.push({id:kid,tgl:tg,wid,pid:+document.getElementById('kb-p').value||null,jumlah:j,ket:document.getElementById('kb-k').value.trim()});fclear('kb-j','kb-k');break}
     case 'del-kas':catat('Menghapus kasbon');S.kasbon=S.kasbon.filter(k=>k.id!==id);break;
     case 'salin-rekap':{
       const L=[['Pekerja','Tipe','Hari','Jam lembur','Upah normal','Upah lembur','Kasbon','Diterima'].join('\t')];
@@ -891,21 +895,21 @@ document.addEventListener('click',e=>{
       return}
     case 'add-proj':{
       const n=document.getElementById('np-n').value.trim();if(!n){toast('Isi nama proyek');return}
-      const pid=nid();stamp('p|'+pid,'Proyek '+n);S.projects.push({id:pid,nama:n,warna:WARNA[S.projects.length%WARNA.length],aktif:true});break}
+      const pid=nid();stamp('p|'+pid,'Proyek '+n);S.projects.push({id:pid,nama:n,warna:WARNA[S.projects.length%WARNA.length],aktif:true});fclear('np-n');break}
     case 'del-proj':
       if(S.segs.some(s=>s.pid===id)||S.kasbon.some(k=>k.pid===id)){toast('Proyek ini sudah punya absensi atau kasbon. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus proyek');S.projects=S.projects.filter(p=>p.id!==id);break;
     case 'add-grup':{
       const n=document.getElementById('ng-n').value.trim();if(!n){toast('Isi nama grup');return}
       const gid=nid();stamp('g|'+gid,'Grup '+n);(S.grup=S.grup||[]).push({id:gid,nama:n,aturan:document.getElementById('ng-a').value});
-      UI.nwGrup='g'+gid;toast(`Grup ${n} ditambahkan dan sudah terpilih di form tambah pekerja.`);break}
+      UI.nwGrup='g'+gid;UI.form=UI.form||{};UI.form['nw-t']=UI.nwGrup;fclear('ng-n');toast(`Grup ${n} ditambahkan dan sudah terpilih di form tambah pekerja.`);break}
     case 'del-grup':
       if(S.workers.some(w=>w.grup===id)){toast('Grup ini masih dipakai pekerja. Pindahkan pekerjanya ke grup lain dulu.');return}
       catat('Menghapus grup');S.grup=(S.grup||[]).filter(g=>g.id!==id);if(UI.nwGrup==='g'+id)UI.nwGrup='';break;
     case 'add-w':{
       const n=document.getElementById('nw-n').value.trim(),u=+document.getElementById('nw-u').value,l=+document.getElementById('nw-l').value;
       if(!n||!(u>0)){toast('Isi nama dan upah harian');return}
-      const wid=nid();stamp('w|'+wid,'Pekerja '+n);const nw={id:wid,nama:n,tipe:'workshop',grup:null,upah:u,lembur:l>0?l:0,aktif:true};UI.nwGrup=document.getElementById('nw-t').value;setGrup(nw,UI.nwGrup);S.workers.push(nw);break}
+      const wid=nid();stamp('w|'+wid,'Pekerja '+n);const nw={id:wid,nama:n,tipe:'workshop',grup:null,upah:u,lembur:l>0?l:0,aktif:true};UI.nwGrup=document.getElementById('nw-t').value;setGrup(nw,UI.nwGrup);S.workers.push(nw);fclear('nw-n','nw-u','nw-l');toast(`${n} ditambahkan ke grup ${grupNama(nw)}`);break}
     case 'del-w':
       if(S.segs.some(s=>s.wid===id)||S.kasbon.some(k=>k.wid===id)){toast('Pekerja ini sudah punya absensi. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus pekerja');S.workers=S.workers.filter(w=>w.id!==id);break;
