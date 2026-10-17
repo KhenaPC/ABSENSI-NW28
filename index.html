@@ -834,6 +834,28 @@ function vAturan(){
 
 /* ---------- RENDER ---------- */
 /* ---------- ALAT (peminjaman alat per proyek) ---------- */
+const AL_F={semua:'Semua status',pinjam:'Masih dipinjam',kembali:'Sudah kembali'};
+function lapAlatHTML(judul,sub,rows,kolP){
+  const lg=logoURL(),np=rows.filter(a=>!a.kembali).length;
+  return `<div class="slip lap">
+    <div class="slip-head">${lg?`<img src="${lg}" alt="">`:''}<div><div class="label">Daftar peminjaman alat</div><h2>${judul}</h2><div class="small muted">${sub}</div></div>
+      <div style="margin-left:auto;text-align:right"><div class="label">Masih dipinjam</div><div class="big num" style="font-size:28px;color:var(--ot)">${np}</div><div class="small muted">dari ${rows.length} catatan</div></div></div>
+    <table><thead><tr><th>Tanggal</th><th>Alat</th><th class="r">Jumlah</th>${kolP?'<th>Proyek</th>':''}<th>Penerima</th><th>Pemberi</th><th>Status</th></tr></thead>
+    <tbody>${rows.map(a=>{const p=P(a.pid),w=W(a.wid);return `<tr><td>${tglPendek(a.tgl)}</td><td><b>${esc(a.nama)}</b>${a.ket?`<div class="small muted">${esc(a.ket)}</div>`:''}</td><td class="r">${a.jumlah||1}</td>${kolP?`<td>${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'Tanpa proyek'}</td>`:''}<td>${w?esc(w.nama):'–'}</td><td>${esc(a.pemberi||'–')}</td><td>${a.kembali?`<span class="pill gr">Kembali ${tglPendek(a.kembali)}</span>`:'<span class="pill ot">Dipinjam</span>'}</td></tr>`}).join('')}</tbody></table>
+    <div class="small muted">Dibuat ${jamEdit(Date.now())} oleh ${esc(UI.user)} · NW28 Absensi · Natawira Dwi Ashta</div>
+  </div>`;
+}
+function unduhAlat(v){
+  const f=UI.alatF||'semua',view=UI.alatView||'pinjam';
+  const L=(S.alat||[]).slice().sort((a,b)=>a.tgl<b.tgl?1:a.tgl>b.tgl?-1:b.id-a.id).filter(a=>f==='semua'||(f==='pinjam'?!a.kembali:!!a.kembali));
+  if(!L.length){toast('Tidak ada catatan alat untuk diunduh');return}
+  const sub=`${AL_F[f]} · per ${tglPanjang(HARI_INI)}`,kunci=a=>P(a.pid)?a.pid:0,nm=id=>id?P(id).nama:'Tanpa proyek';
+  if(v!==''){const id=+v,r=L.filter(a=>kunci(a)===id);if(!r.length){toast('Tidak ada catatan untuk proyek ini');return}
+    return buatPDF([lapAlatHTML(esc(nm(id)),sub,r,false)],`Alat-${slug(nm(id))}_${HARI_INI}.pdf`,'PDF alat diunduh')}
+  if(view==='pinjam')return buatPDF([lapAlatHTML('Semua proyek',sub,L,true)],`Alat-semua-proyek_${HARI_INI}.pdf`,'PDF alat diunduh');
+  const ids=[...S.projects.map(p=>p.id).filter(id=>L.some(a=>kunci(a)===id)),...(L.some(a=>kunci(a)===0)?[0]:[])];
+  buatPDF(ids.map(id=>lapAlatHTML(esc(nm(id)),sub,L.filter(a=>kunci(a)===id),false)),`Alat-per-proyek_${HARI_INI}.pdf`,`PDF berisi ${ids.length} proyek diunduh`);
+}
 function vAlat(){
   const semua=(S.alat||[]).slice().sort((a,b)=>a.tgl<b.tgl?1:a.tgl>b.tgl?-1:b.id-a.id);
   const f=UI.alatF||'semua',view=UI.alatView||'pinjam';
@@ -869,7 +891,7 @@ function vAlat(){
     const by=new Map();for(const a of L){const k=P(a.pid)?a.pid:0;if(!by.has(k))by.set(k,[]);by.get(k).push(a)}
     const urut=[...S.projects.map(p=>p.id).filter(id=>by.has(id)),...(by.has(0)?[0]:[])];
     isi=urut.map(id=>{const p=P(id),r=by.get(id),ra=semua.filter(a=>(P(a.pid)?a.pid:0)===id),np=ra.filter(a=>!a.kembali).length;return `<section class="panel kartu">
-      <div class="row"><h3 class="grow">${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'Tanpa proyek'}</h3><span class="pill ot">${np} dipinjam</span><span class="pill gr">${ra.length-np} kembali</span></div>
+      <div class="row"><h3 class="grow">${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'Tanpa proyek'}</h3><span class="pill ot">${np} dipinjam</span><span class="pill gr">${ra.length-np} kembali</span><button class="btn" data-act="al-pdf" data-v="${id}">Unduh PDF</button></div>
       ${tabel(r,false)}</section>`}).join('');
   }
   return `<div><div class="label">Alat kerja</div><h2 style="font-size:24px">Peminjaman alat</h2></div>
@@ -878,7 +900,8 @@ function vAlat(){
   <div class="chips" role="group" aria-label="Status"><span class="small muted">Status:</span>
     <button class="chip" data-act="al-f" data-v="semua" aria-pressed="${f==='semua'}">Semua <span class="n">${semua.length}</span></button>
     <button class="chip" data-act="al-f" data-v="pinjam" aria-pressed="${f==='pinjam'}">Masih dipinjam <span class="n">${nP}</span></button>
-    <button class="chip" data-act="al-f" data-v="kembali" aria-pressed="${f==='kembali'}">Sudah kembali <span class="n">${nK}</span></button></div>
+    <button class="chip" data-act="al-f" data-v="kembali" aria-pressed="${f==='kembali'}">Sudah kembali <span class="n">${nK}</span></button>
+    <span class="grow"></span>${L.length?`<button class="btn pri" data-act="al-pdf" data-v="">${view==='pinjam'?'Unduh PDF':'Unduh PDF semua proyek'}</button>`:''}</div>
   ${isi}`;
 }
 const TABS=[['absensi','Absensi'],['gaji','Gaji'],['proyek','Proyek'],['alat','Alat'],['pekerja','Pekerja'],['aturan','Aturan']];
@@ -968,6 +991,7 @@ document.addEventListener('click',e=>{
     case 'del-proj':
       if(S.segs.some(s=>s.pid===id)||S.kasbon.some(k=>k.pid===id)||(S.alat||[]).some(a=>a.pid===id)){toast('Proyek ini sudah punya absensi atau kasbon. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus proyek');S.projects=S.projects.filter(p=>p.id!==id);break;
+    case 'al-pdf':unduhAlat(t.dataset.v);return;
     case 'al-view':UI.alatView=t.dataset.v;render();return;
     case 'al-f':UI.alatF=t.dataset.v;render();return;
     case 'al-add':{
