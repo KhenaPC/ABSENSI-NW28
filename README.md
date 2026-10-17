@@ -1,5 +1,7 @@
 # NW28 Absensi
 
+Link aplikasi: https://aplikasiabsensinw-28.vercel.app (Vercel, deploy otomatis dari branch `nw28-absensi-v2`)
+
 Aplikasi absensi dan upah harian per proyek untuk NW28 (Natawira Dwi Ashta).
 
 ## Isi
