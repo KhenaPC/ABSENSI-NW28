@@ -293,7 +293,7 @@ function hitung(w,list){
 const KEY='nw28-absensi-v1', T0=360, T1=1440, TMAX=1920; // blok kerja boleh sampai 08:00 hari berikutnya
 const TIPE={workshop:'Workshop NW28',garut:'Tim Garut',event:'Event'}, PC={workshop:'ws',garut:'gr',event:'ev'};
 const ARGO=()=>({mode:'argo',mulai:0,selesai:1440,ist:[]});
-const FORM=['nw-n','nw-t','nw-u','nw-l','ng-n','ng-a','np-n','kb-w','kb-p','kb-t','kb-j','kb-k'];
+const FORM=['al-t','al-n','al-j','al-p','al-w','al-g','al-k','nw-n','nw-t','nw-u','nw-l','ng-n','ng-a','np-n','kb-w','kb-p','kb-t','kb-j','kb-k'];
 const fv=(id,def='')=>UI.form&&UI.form[id]!=null?UI.form[id]:def;
 const fclear=(...ids)=>{if(UI.form)for(const i of ids)delete UI.form[i]};
 for(const ev of ['input','change'])document.addEventListener(ev,e=>{const t=e.target;if(t&&FORM.includes(t.id)){UI.form=UI.form||{};UI.form[t.id]=t.value}},true);
@@ -349,7 +349,7 @@ function seed(){
 }
 const SB_URL='https://gomgkfjyrbfsimpjpgaq.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbWdrZmp5cmJmc2ltcGpwZ2FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MDU1NTQsImV4cCI6MjA5OTE4MTU1NH0.QMASEClyaxP8xLHMH8ohaHQlnliR8Pew-0BYAe-WWzA';
 const RULE=(mulai,selesai,dobel)=>({mulai,selesai,ist:[[720,780],[1080,1140]],dobel,dobelJam:1380,ganti:true});
-function kosong(){return {contoh:false,v2:true,nid:1000,workers:[],projects:[],rules:{workshop:RULE(480,960,false),garut:RULE(420,1020,true),event:ARGO()},segs:[],kasbon:[],grup:[],edit:{},log:[]}}
+function kosong(){return {contoh:false,v2:true,nid:1000,workers:[],projects:[],rules:{workshop:RULE(480,960,false),garut:RULE(420,1020,true),event:ARGO()},segs:[],kasbon:[],grup:[],alat:[],edit:{},log:[]}}
 S=kosong();
 let VER=0,CRED=null,saving=false,dirty=false,saveT=0;
 async function rpc(fn,body){
@@ -357,7 +357,7 @@ async function rpc(fn,body){
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];if(!S.rules.event)S.rules.event=ARGO()}
+function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];if(!S.rules.event)S.rules.event=ARGO()}
 function setSync(t){UI.sync=t;const e=document.getElementById('sync');if(e)e.textContent=t}
 async function masuk(u,p){
   const r=await rpc('nw28_load',{p_user:u,p_pass:p,p_have:null});
@@ -833,8 +833,56 @@ function vAturan(){
 }
 
 /* ---------- RENDER ---------- */
-const TABS=[['absensi','Absensi'],['gaji','Gaji'],['proyek','Proyek'],['pekerja','Pekerja'],['aturan','Aturan']];
-const VIEW={absensi:vAbsensi,gaji:vGaji,proyek:vProyek,pekerja:vPekerja,aturan:vAturan};
+/* ---------- ALAT (peminjaman alat per proyek) ---------- */
+function vAlat(){
+  const semua=(S.alat||[]).slice().sort((a,b)=>a.tgl<b.tgl?1:a.tgl>b.tgl?-1:b.id-a.id);
+  const f=UI.alatF||'semua',view=UI.alatView||'pinjam';
+  const L=semua.filter(a=>f==='semua'||(f==='pinjam'?!a.kembali:!!a.kembali));
+  const nP=semua.filter(a=>!a.kembali).length,nK=semua.length-nP;
+  const baris=(a,kolP)=>{const p=P(a.pid),w=W(a.wid);return `<tr>
+    <td class="num">${tglPendek(a.tgl)}</td>
+    <td><b>${esc(a.nama)}</b>${a.jumlah>1?` <span class="muted num">×${a.jumlah}</span>`:''}${a.ket?`<div class="small muted">${esc(a.ket)}</div>`:''}</td>
+    ${kolP?`<td>${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'<span class="muted">Tanpa proyek</span>'}</td>`:''}
+    <td>${w?esc(w.nama):'<span class="muted">–</span>'}</td>
+    <td>${a.pemberi?esc(a.pemberi):'<span class="muted">–</span>'}</td>
+    <td>${a.kembali?`<span class="pill gr">Kembali ${tglPendek(a.kembali)}</span> <button class="btn small" data-act="al-batal" data-id="${a.id}">Batal</button>`:`<span class="pill ot">Dipinjam</span> <button class="btn small" data-act="al-kembali" data-id="${a.id}">Tandai kembali</button>`}${ed('al|'+a.id)}</td>
+    <td><button class="x" data-act="al-del" data-id="${a.id}" aria-label="Hapus catatan">×</button></td></tr>`};
+  const tabel=(rows,kolP)=>`<div class="tbl"><table><thead><tr><th>Tanggal</th><th>Alat</th>${kolP?'<th>Proyek</th>':''}<th>Penerima</th><th>Pemberi</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(a=>baris(a,kolP)).join('')}</tbody></table></div>`;
+  const nama=[...new Set([UI.user,...S.workers.filter(w=>w.aktif).map(w=>w.nama)])];
+  const form=`<section class="panel kartu"><h3>Catat peminjaman alat</h3>
+    <div class="row">
+      <input type="date" id="al-t" value="${esc(fv('al-t',HARI_INI))}" aria-label="Tanggal pinjam">
+      <input type="text" id="al-n" class="grow" value="${esc(fv('al-n'))}" placeholder="Nama alat, misal Bor listrik Makita" aria-label="Nama alat">
+      <label class="row small">Jumlah <input type="number" id="al-j" min="1" step="1" inputmode="numeric" value="${esc(fv('al-j','1'))}" style="width:80px" aria-label="Jumlah"></label>
+    </div>
+    <div class="row">
+      <select id="al-p" aria-label="Proyek"><option value="0">Pilih proyek</option>${opsiProyek(+fv('al-p',0))}</select>
+      <select id="al-w" aria-label="Penerima"><option value="0">Penerima (pekerja)</option>${opsiPekerja(+fv('al-w',0))}</select>
+      <input type="text" id="al-g" list="al-g-list" value="${esc(fv('al-g',UI.user))}" placeholder="Pemberi alat" aria-label="Pemberi alat"><datalist id="al-g-list">${nama.map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist>
+      <input type="text" id="al-k" class="grow" value="${esc(fv('al-k'))}" placeholder="Keterangan (opsional)" aria-label="Keterangan">
+      <button class="btn pri" data-act="al-add">+ Catat peminjaman</button>
+    </div></section>`;
+  let isi;
+  if(!L.length)isi=`<section class="panel"><p class="muted" style="margin:0">${semua.length?'Tidak ada catatan untuk pilihan ini.':'Belum ada peminjaman alat. Catat yang pertama lewat form di atas.'}</p></section>`;
+  else if(view==='pinjam')isi=`<section class="panel">${tabel(L,true)}</section>`;
+  else{
+    const by=new Map();for(const a of L){const k=P(a.pid)?a.pid:0;if(!by.has(k))by.set(k,[]);by.get(k).push(a)}
+    const urut=[...S.projects.map(p=>p.id).filter(id=>by.has(id)),...(by.has(0)?[0]:[])];
+    isi=urut.map(id=>{const p=P(id),r=by.get(id),ra=semua.filter(a=>(P(a.pid)?a.pid:0)===id),np=ra.filter(a=>!a.kembali).length;return `<section class="panel kartu">
+      <div class="row"><h3 class="grow">${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'Tanpa proyek'}</h3><span class="pill ot">${np} dipinjam</span><span class="pill gr">${ra.length-np} kembali</span></div>
+      ${tabel(r,false)}</section>`}).join('');
+  }
+  return `<div><div class="label">Alat kerja</div><h2 style="font-size:24px">Peminjaman alat</h2></div>
+  <div class="chips" role="group" aria-label="Tampilan"><button class="chip" data-act="al-view" data-v="pinjam" aria-pressed="${view==='pinjam'}">List Peminjaman Alat</button><button class="chip" data-act="al-view" data-v="proyek" aria-pressed="${view==='proyek'}">List Alat (per proyek)</button></div>
+  ${view==='pinjam'?form:''}
+  <div class="chips" role="group" aria-label="Status"><span class="small muted">Status:</span>
+    <button class="chip" data-act="al-f" data-v="semua" aria-pressed="${f==='semua'}">Semua <span class="n">${semua.length}</span></button>
+    <button class="chip" data-act="al-f" data-v="pinjam" aria-pressed="${f==='pinjam'}">Masih dipinjam <span class="n">${nP}</span></button>
+    <button class="chip" data-act="al-f" data-v="kembali" aria-pressed="${f==='kembali'}">Sudah kembali <span class="n">${nK}</span></button></div>
+  ${isi}`;
+}
+const TABS=[['absensi','Absensi'],['gaji','Gaji'],['proyek','Proyek'],['alat','Alat'],['pekerja','Pekerja'],['aturan','Aturan']];
+const VIEW={absensi:vAbsensi,gaji:vGaji,proyek:vProyek,alat:vAlat,pekerja:vPekerja,aturan:vAturan};
 function render(){
   const who=document.getElementById('who');
   if(!UI.user){document.getElementById('tabs').innerHTML='';who.innerHTML='';document.getElementById('stripe').innerHTML='';document.getElementById('app').innerHTML=vLogin();return}
@@ -918,8 +966,25 @@ document.addEventListener('click',e=>{
       const n=document.getElementById('np-n').value.trim();if(!n){toast('Isi nama proyek');return}
       const pid=nid();stamp('p|'+pid,'Proyek '+n);S.projects.push({id:pid,nama:n,warna:WARNA[S.projects.length%WARNA.length],aktif:true});fclear('np-n');break}
     case 'del-proj':
-      if(S.segs.some(s=>s.pid===id)||S.kasbon.some(k=>k.pid===id)){toast('Proyek ini sudah punya absensi atau kasbon. Nonaktifkan saja supaya datanya aman.');return}
+      if(S.segs.some(s=>s.pid===id)||S.kasbon.some(k=>k.pid===id)||(S.alat||[]).some(a=>a.pid===id)){toast('Proyek ini sudah punya absensi atau kasbon. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus proyek');S.projects=S.projects.filter(p=>p.id!==id);break;
+    case 'al-view':UI.alatView=t.dataset.v;render();return;
+    case 'al-f':UI.alatF=t.dataset.v;render();return;
+    case 'al-add':{
+      const g=i=>document.getElementById(i).value;
+      const tgl=g('al-t'),n=g('al-n').trim(),pid=+g('al-p'),wid=+g('al-w'),jm=Math.max(1,Math.round(+g('al-j')||1));
+      if(!tgl||!n){toast('Isi tanggal dan nama alat');return}
+      if(!pid){toast('Pilih proyek yang meminjam alat');return}
+      if(!wid){toast('Pilih pekerja penerima alat');return}
+      const aid=nid();S.alat=S.alat||[];
+      S.alat.push({id:aid,tgl,nama:n,jumlah:jm,pid,wid,pemberi:g('al-g').trim(),ket:g('al-k').trim(),kembali:null});
+      stamp('al|'+aid,'Pinjam alat '+n);fclear('al-n','al-j','al-k');toast(`${n} dicatat dipinjam oleh ${W(wid).nama}`);break}
+    case 'al-kembali':case 'al-batal':{
+      const a=(S.alat||[]).find(x=>x.id===id);if(!a)return;
+      a.kembali=act==='al-kembali'?HARI_INI:null;stamp('al|'+id,(a.kembali?'Alat kembali ':'Batal kembali ')+a.nama);break}
+    case 'al-del':{
+      const a=(S.alat||[]).find(x=>x.id===id);if(!a)return;
+      catat('Menghapus catatan alat '+a.nama);S.alat=S.alat.filter(x=>x.id!==id);break}
     case 'add-grup':{
       const n=document.getElementById('ng-n').value.trim();if(!n){toast('Isi nama grup');return}
       const gid=nid();stamp('g|'+gid,'Grup '+n);(S.grup=S.grup||[]).push({id:gid,nama:n,aturan:document.getElementById('ng-a').value});
@@ -932,7 +997,7 @@ document.addEventListener('click',e=>{
       if(!n||!(u>0)){toast('Isi nama dan upah harian');return}
       const wid=nid();stamp('w|'+wid,'Pekerja '+n);const nw={id:wid,nama:n,tipe:'workshop',grup:null,upah:u,lembur:l>0?l:0,aktif:true};UI.nwGrup=document.getElementById('nw-t').value;setGrup(nw,UI.nwGrup);S.workers.push(nw);fclear('nw-n','nw-u','nw-l');toast(`${n} ditambahkan ke grup ${grupNama(nw)}`);break}
     case 'del-w':
-      if(S.segs.some(s=>s.wid===id)||S.kasbon.some(k=>k.wid===id)){toast('Pekerja ini sudah punya absensi. Nonaktifkan saja supaya datanya aman.');return}
+      if(S.segs.some(s=>s.wid===id)||S.kasbon.some(k=>k.wid===id)||(S.alat||[]).some(a=>a.wid===id)){toast('Pekerja ini sudah punya absensi. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus pekerja');S.workers=S.workers.filter(w=>w.id!==id);break;
     case 'reset':UI.reset=true;render();return;
     case 'reset-batal':UI.reset=false;render();return;
