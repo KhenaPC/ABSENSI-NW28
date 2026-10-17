@@ -307,7 +307,25 @@ const setGrup=(w,v)=>{if(v.startsWith('grp:')){const g=GR(+v.slice(4));if(g){w.g
 const opsiGrup=(v,pendek)=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('')+(S.grup||[]).map(g=>`<option value="grp:${g.id}"${'grp:'+g.id===v?' selected':''}>${esc(g.nama)}${pendek?'':` (aturan ${TIPE[g.aturan]})`}</option>`).join('');
 const opsiTipe=v=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('');
 const jamTxt=x=>x.argo?`${hm(x.s.a)} + ${x.argo}×24 jam`:`${hm(x.s.a)}–${hm(x.s.b)}`;
-const WARNA=['#2F6BFF','#12A594','#E0338B','#E5A800','#8B5CF6','#FF7A1A','#3FAE3A','#E5484D'];
+const WARNA=['#2F6BFF','#12A594','#E0338B','#E5A800','#8B5CF6','#FF7A1A','#3FAE3A','#E5484D','#00B8D9','#8D5524','#9BCF2E','#1E3A8A','#C026D3','#6B7280','#065F46','#F472B6','#7F1D1D','#60A5FA','#4D7C0F','#FDBA74'];
+// warna proyek harus unik: proyek yang warnanya sama/terlalu mirip dengan proyek sebelumnya diberi warna lain
+const rgbOf=c=>{const m=/^#?([0-9a-f]{6})$/i.exec(String(c||''));if(!m)return null;const n=parseInt(m[1],16);return [n>>16&255,n>>8&255,n&255]};
+const jarak=(a,b)=>{const x=rgbOf(a),y=rgbOf(b);if(!x||!y)return 0;const r=(x[0]+y[0])/2,d=[x[0]-y[0],x[1]-y[1],x[2]-y[2]];return Math.sqrt((2+r/256)*d[0]*d[0]+4*d[1]*d[1]+(2+(255-r)/256)*d[2]*d[2])};
+const hsl2hex=(hh,s,l)=>{s/=100;l/=100;const k=n=>(n+hh/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));return '#'+[f(0),f(8),f(4)].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('').toUpperCase()};
+function warnaBebas(dipakai){
+  const ok=c=>dipakai.every(u=>jarak(c,u)>=90);
+  for(const c of WARNA)if(ok(c))return c;
+  for(let i=0;i<360;i++){const c=hsl2hex((i*137.508)%360,65+(i%3)*10,42+(i%4)*8);if(ok(c))return c}
+  return hsl2hex(Math.random()*360,70,50);
+}
+function rapikanWarna(){
+  let ubah=false;const dipakai=[];
+  for(const p of S.projects||[]){
+    if(!rgbOf(p.warna)||dipakai.some(u=>jarak(p.warna,u)<40)){p.warna=warnaBebas(dipakai);ubah=true}
+    dipakai.push(p.warna);
+  }
+  return ubah;
+}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rp=n=>'Rp'+Math.round(n).toLocaleString('id-ID');
 const num=(n,d=2)=>(Math.round(n*10**d)/10**d).toLocaleString('id-ID');
@@ -361,7 +379,7 @@ async function rpc(fn,body){
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];if(!S.rules.event)S.rules.event=ARGO()}
+function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];if(!S.rules.event)S.rules.event=ARGO();if(rapikanWarna())setTimeout(()=>{if(CRED)simpan()},0)}
 function setSync(t){UI.sync=t;const e=document.getElementById('sync');if(e)e.textContent=t}
 async function masuk(u,p){
   const r=await rpc('nw28_load',{p_user:u,p_pass:p,p_have:null});
@@ -1011,7 +1029,7 @@ document.addEventListener('click',e=>{
       return}
     case 'add-proj':{
       const n=document.getElementById('np-n').value.trim();if(!n){toast('Isi nama proyek');return}
-      const pid=nid();stamp('p|'+pid,'Proyek '+n);S.projects.push({id:pid,nama:n,warna:WARNA[S.projects.length%WARNA.length],aktif:true});fclear('np-n');break}
+      const pid=nid();stamp('p|'+pid,'Proyek '+n);S.projects.push({id:pid,nama:n,warna:warnaBebas(S.projects.map(p=>p.warna)),aktif:true});fclear('np-n');break}
     case 'del-proj':
       if(S.segs.some(s=>s.pid===id)||S.kasbon.some(k=>k.pid===id)||(S.alat||[]).some(a=>a.pid===id)){toast('Proyek ini sudah punya absensi atau kasbon. Nonaktifkan saja supaya datanya aman.');return}
       catat('Menghapus proyek');S.projects=S.projects.filter(p=>p.id!==id);break;
@@ -1068,7 +1086,7 @@ document.addEventListener('change',e=>{
   const id=+t.dataset.id,f=t.dataset.f,v=t.type==='checkbox'?t.checked:t.value;
   if(k==='seg'){const s=S.segs.find(x=>x.id===id);if(!s)return;abs(s.wid,s.tgl);if(f==='tarif')s.tarif=v===''?null:Math.max(0,+v||0);else if(f==='hari')s.hari=Math.max(1,Math.round(+v)||1);else s[f]=+v}
   else if(k==='w'){const w=W(id);stamp('w|'+id,'Pekerja '+w.nama);if(f==='nama')w.nama=v.trim()||w.nama;else if(f==='grup')setGrup(w,v);else if(f==='wa')w.wa=normWA(v);else if(f==='tipe'||f==='aktif')w[f]=v;else w[f]=Math.max(0,+v||0)}
-  else if(k==='p'){const p=P(id);stamp('p|'+id,'Proyek '+p.nama);if(f==='nama')p.nama=v.trim()||p.nama;else p[f]=v}
+  else if(k==='p'){const p=P(id);stamp('p|'+id,'Proyek '+p.nama);if(f==='nama')p.nama=v.trim()||p.nama;else p[f]=v;if(f==='warna'){const sama=S.projects.find(q=>q.id!==id&&jarak(q.warna,v)<40);if(sama)toast(`Warna ini mirip dengan proyek ${sama.nama}. Sebaiknya pilih warna lain.`)}}
   else if(k==='r'){const r=S.rules[t.dataset.tipe];stamp('r|'+t.dataset.tipe,'Aturan '+TIPE[t.dataset.tipe]);
     if(f==='ist')r.ist[+t.dataset.i][+t.dataset.j]=+v;else if(f==='dobel')r.dobel=v;else if(f==='ganti')r.ganti=v==='1';else r[f]=+v;
     if(r.selesai<=r.mulai)toast('Jam selesai normal harus setelah jam mulai')}
