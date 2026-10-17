@@ -1019,7 +1019,7 @@ document.addEventListener('click',e=>{
     case 'wa-open':{
       const o=dataGaji().find(x=>x.w.id===id);if(!o||!UI.wa)return;
       const url=`https://wa.me/${o.w.wa||''}?text=${encodeURIComponent(UI.wa.teks)}`;
-      const win=window.open(url,'_blank','noopener');if(!win)location.href=url;return}
+      const win=window.open(url,'_blank');if(win){try{win.opener=null}catch(e){}}else location.href=url;return}
     case 'wa-share':{
       if(!UI.wa||!UI.wa.file)return;
       navigator.share({files:[UI.wa.file],title:UI.wa.file.name,text:UI.wa.teks}).catch(e=>{if(e&&e.name!=='AbortError')toast('Gagal membuka menu bagikan. Pakai tombol Buka WhatsApp.')});return}
