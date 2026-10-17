@@ -194,6 +194,11 @@ td.ck,th.ck{width:34px;padding-right:0}
 .slip-head img{height:78px;width:auto}
 .slip-head h2{font-size:26px}
 .slip .detail-list{background:var(--surface-2);border-radius:10px;padding:12px 14px;gap:5px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip:hover{border-color:var(--brand)}
+.chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.chip .n{font-weight:500;opacity:.75;font-variant-numeric:tabular-nums}
 #toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:20;max-width:calc(100% - 32px);text-align:center}
 @media (prefers-reduced-motion:no-preference){.blk{transition:left .2s,width .2s}}
 </style>
@@ -636,8 +641,22 @@ function unduhProyek(ids){
   if(!L.length){toast('Centang dulu proyek yang mau diunduh');return}
   buatPDF(L.map(lapHTML),`Proyek-${L.length===1?slug(L[0].p.nama):L.length+'-proyek'}_${UI.dari}_${UI.sampai}.pdf`,L.length===1?'PDF proyek diunduh':`PDF berisi ${L.length} proyek diunduh`);
 }
+// filter tampilan gaji per grup/tipe pekerja (hanya tampilan, data tidak berubah)
+const kunciGrup=w=>w.grup&&GR(w.grup)?'grp:'+w.grup:w.tipe;
+const cocokGaji=o=>!UI.fGaji||!UI.fGaji.size||UI.fGaji.has(kunciGrup(o.w));
+const gajiTampil=()=>dataGaji().filter(cocokGaji);
+function chipsGaji(semua){
+  const n={};for(const o of semua){const k=kunciGrup(o.w);n[k]=(n[k]||0)+1}
+  const keys=Object.keys(n).sort((a,b)=>grupNama({tipe:a.startsWith('grp:')?'':a,grup:a.startsWith('grp:')?+a.slice(4):null}).localeCompare(grupNama({tipe:b.startsWith('grp:')?'':b,grup:b.startsWith('grp:')?+b.slice(4):null})));
+  const lbl=k=>k.startsWith('grp:')?esc((GR(+k.slice(4))||{}).nama||'?'):TIPE[k];
+  const on=UI.fGaji&&UI.fGaji.size;
+  return `<div class="chips" role="group" aria-label="Tampilkan tipe pekerja"><span class="small muted">Tampilkan:</span>
+    <button class="chip" data-act="fgaji" data-v="" aria-pressed="${!on}">Semua <span class="n">${semua.length}</span></button>
+    ${keys.map(k=>`<button class="chip" data-act="fgaji" data-v="${k}" aria-pressed="${!!(on&&UI.fGaji.has(k))}">${lbl(k)} <span class="n">${n[k]}</span></button>`).join('')}
+  </div>`;
+}
 function vGaji(){
-  const rows=dataGaji(),T={hari:0,lem:0,bN:0,bL:0,kas:0};
+  const semua=dataGaji(),rows=semua.filter(cocokGaji),T={hari:0,lem:0,bN:0,bL:0,kas:0};
   let body='';
   for(const o of rows){
     for(const k in T)T[k]+=o[k];
@@ -651,6 +670,7 @@ function vGaji(){
   const kas=S.kasbon.filter(k=>k.tgl>=UI.dari&&k.tgl<=UI.sampai).map(k=>{const w=W(k.wid);return `<div class="blok"><b>${esc(w?w.nama:'?')}</b><span class="muted small">${tglPendek(k.tgl)}</span><select id="k${k.id}p" data-k="kas" data-id="${k.id}" data-f="pid" aria-label="Proyek kasbon"><option value="0">Tanpa proyek</option>${opsiProyek(k.pid||0)}</select><span class="grow small">${esc(k.ket||'')}</span><span class="num"><b>${rp(k.jumlah)}</b></span>${ed('k|'+k.id)}<button class="x" data-act="del-kas" data-id="${k.id}" aria-label="Hapus kasbon">×</button></div>`}).join('');
   return `${periodeBar('Rekap gaji')}
   <section class="panel">
+    ${semua.length?chipsGaji(semua):''}
     ${rows.length?`<div class="tbl"><table>
       <thead><tr><th class="ck"><input type="checkbox" id="sl-semua" data-k="slip-semua"${rows.every(o=>UI.slip.has(o.w.id))?' checked':''} aria-label="Pilih semua untuk PDF"></th><th>Pekerja</th><th>Tipe</th><th class="r">Hari</th><th class="r">Jam lembur</th><th class="r">Upah normal</th><th class="r">Upah lembur</th><th class="r">Kasbon</th><th class="r">Diterima</th></tr></thead>
       <tbody>${body}</tbody>
@@ -850,7 +870,8 @@ document.addEventListener('click',e=>{
   const act=t.dataset.act,id=+t.dataset.id;
   switch(act){
     case 'pdf':unduhPDF([id]);return;
-    case 'pdf-pilih':unduhPDF([...UI.slip]);return;
+    case 'pdf-pilih':{const vis=new Set(gajiTampil().map(o=>o.w.id));unduhPDF([...UI.slip].filter(i=>vis.has(i)));return}return;
+    case 'fgaji':{const v=t.dataset.v;UI.fGaji=UI.fGaji||new Set();if(!v)UI.fGaji.clear();else UI.fGaji.has(v)?UI.fGaji.delete(v):UI.fGaji.add(v);render();return}
     case 'pdf-p':unduhProyek([id]);return;
     case 'pdf-p-pilih':unduhProyek([...UI.prj]);return;
     case 'keluar':keluar();return;
@@ -888,7 +909,7 @@ document.addEventListener('click',e=>{
     case 'del-kas':catat('Menghapus kasbon');S.kasbon=S.kasbon.filter(k=>k.id!==id);break;
     case 'salin-rekap':{
       const L=[['Pekerja','Tipe','Hari','Jam lembur','Upah normal','Upah lembur','Kasbon','Diterima'].join('\t')];
-      for(const o of dataGaji())L.push([o.w.nama,grupNama(o.w),num(o.hari),num(o.lem/60),Math.round(o.bN),Math.round(o.bL),Math.round(o.kas),Math.round(o.bN+o.bL-o.kas)].join('\t'));
+      for(const o of gajiTampil())L.push([o.w.nama,grupNama(o.w),num(o.hari),num(o.lem/60),Math.round(o.bN),Math.round(o.bL),Math.round(o.kas),Math.round(o.bN+o.bL-o.kas)].join('\t'));
       const txt=`Rekap gaji ${UI.dari} s.d. ${UI.sampai}\n`+L.join('\n');
       const gagal=()=>{UI.salin=txt;render();const b=document.getElementById('salin-box');if(b){b.focus();b.select()}};
       try{navigator.clipboard.writeText(txt).then(()=>toast('Rekap disalin'),gagal)}catch(err){gagal()}
@@ -936,7 +957,7 @@ document.addEventListener('change',e=>{
   else if(k==='prj'){v?UI.prj.add(id):UI.prj.delete(id);render();return}
   else if(k==='prj-semua'){UI.prj.clear();if(v)for(const o of PRJ.list)UI.prj.add(o.p.id);render();return}
   else if(k==='slip'){v?UI.slip.add(id):UI.slip.delete(id);render();return}
-  else if(k==='slip-semua'){UI.slip.clear();if(v)for(const o of dataGaji())UI.slip.add(o.w.id);render();return}
+  else if(k==='slip-semua'){UI.slip.clear();if(v)for(const o of gajiTampil())UI.slip.add(o.w.id);render();return}
   else if(k==='pilih'){v?UI.pilih.add(id):UI.pilih.delete(id);render();return}
   else if(k==='semua'){UI.pilih.clear();if(v){const sh=S.segs.filter(s=>s.tgl===UI.tgl);for(const w of S.workers)if(w.aktif||sh.some(s=>s.wid===w.id))UI.pilih.add(w.id)}render();return}
   else if(k==='bulk'){UI.bulk[f]=+v;render();return}
