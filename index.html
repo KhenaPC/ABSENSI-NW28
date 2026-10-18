@@ -203,6 +203,38 @@ td.ck,th.ck{width:34px;padding-right:0}
 .btn.wa{background:#1FA855;border-color:#1FA855;color:#FFFFFF}
 .btn.wa:hover{border-color:#178A45;background:#178A45}
 .wa-box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.al-list{display:flex;flex-direction:column;gap:10px}
+.al-item{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.al-item.turun{border-color:var(--bad);box-shadow:inset 4px 0 0 var(--bad)}
+.al-info{min-width:0;display:flex;flex-direction:column;gap:5px}
+.al-info .t{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.al-info .t b{font-size:16px}
+.al-kond{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.al-aksi{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.al-panel{grid-column:1/-1;background:var(--surface-2);border:1px dashed var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+img.foto{display:block;object-fit:cover;border-radius:10px;background:var(--surface-2);cursor:zoom-in;border:1px solid var(--line)}
+.thumb{width:72px;height:72px}
+.foto-kosong{display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;line-height:1.2;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line);border-radius:10px;padding:4px}
+.foto-kosong.thumb{width:72px;height:72px}
+.foto-pilih{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.foto-pilih .thumb{width:72px;height:72px}
+.am-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.am-card{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.am-card .kartu-foto{width:100%;aspect-ratio:4/3;height:auto;max-width:100%}
+.am-card .foto-kosong.kartu-foto{font-size:12px}
+.milik-pilih{display:flex;gap:6px;flex-wrap:wrap}
+.lightbox{position:fixed;inset:0;z-index:40;background:rgba(10,12,30,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:85vh;border-radius:12px;background:#222}
+.lightbox span{color:#FFFFFF;font-size:13px}
+.pdf-al{display:grid;grid-template-columns:150px 1fr 150px;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
+.pdf-al .pf{display:flex;flex-direction:column;gap:4px;align-items:center}
+.pdf-al .pf .box{width:150px;max-height:150px;overflow:hidden;border-radius:8px;border:1px solid var(--line)}
+.pdf-al .pf img{width:150px;height:auto;display:block}
+.pdf-al .pf .foto-kosong{width:150px;height:100px}
+.pdf-al .cap{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pdf-al .pi{display:flex;flex-direction:column;gap:5px;font-size:13px}
+.pdf-al.turun{background:var(--bad-soft)}
+@media (max-width:560px){.al-item{grid-template-columns:60px minmax(0,1fr)}.thumb,.foto-kosong.thumb{width:60px;height:60px}.al-aksi{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;align-items:center}}
 #toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:20;max-width:calc(100% - 32px);text-align:center}
 @media (prefers-reduced-motion:no-preference){.blk{transition:left .2s,width .2s}}
 </style>
@@ -297,7 +329,7 @@ function hitung(w,list){
 const KEY='nw28-absensi-v1', T0=360, T1=1440, TMAX=1920; // blok kerja boleh sampai 08:00 hari berikutnya
 const TIPE={workshop:'Workshop NW28',garut:'Tim Garut',event:'Event'}, PC={workshop:'ws',garut:'gr',event:'ev'};
 const ARGO=()=>({mode:'argo',mulai:0,selesai:1440,ist:[]});
-const FORM=['nw-wa','al-t','al-n','al-j','al-p','al-w','al-g','al-k','nw-n','nw-t','nw-u','nw-l','ng-n','ng-a','np-n','kb-w','kb-p','kb-t','kb-j','kb-k'];
+const FORM=['am-n','am-o','am-c','am-k','al-m','al-kp','al-kc','bk-k','bk-c','nw-wa','al-t','al-n','al-j','al-p','al-w','al-g','al-k','nw-n','nw-t','nw-u','nw-l','ng-n','ng-a','np-n','kb-w','kb-p','kb-t','kb-j','kb-k'];
 const fv=(id,def='')=>UI.form&&UI.form[id]!=null?UI.form[id]:def;
 const fclear=(...ids)=>{if(UI.form)for(const i of ids)delete UI.form[i]};
 for(const ev of ['input','change'])document.addEventListener(ev,e=>{const t=e.target;if(t&&FORM.includes(t.id)){UI.form=UI.form||{};UI.form[t.id]=t.value}},true);
@@ -371,7 +403,7 @@ function seed(){
 }
 const SB_URL='https://gomgkfjyrbfsimpjpgaq.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbWdrZmp5cmJmc2ltcGpwZ2FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MDU1NTQsImV4cCI6MjA5OTE4MTU1NH0.QMASEClyaxP8xLHMH8ohaHQlnliR8Pew-0BYAe-WWzA';
 const RULE=(mulai,selesai,dobel)=>({mulai,selesai,ist:[[720,780],[1080,1140]],dobel,dobelJam:1380,ganti:true});
-function kosong(){return {contoh:false,v2:true,nid:1000,workers:[],projects:[],rules:{workshop:RULE(480,960,false),garut:RULE(420,1020,true),event:ARGO()},segs:[],kasbon:[],grup:[],alat:[],edit:{},log:[]}}
+function kosong(){return {contoh:false,v2:true,nid:1000,workers:[],projects:[],rules:{workshop:RULE(480,960,false),garut:RULE(420,1020,true),event:ARGO()},segs:[],kasbon:[],grup:[],alat:[],alatMaster:[],edit:{},log:[]}}
 S=kosong();
 let VER=0,CRED=null,saving=false,dirty=false,saveT=0;
 async function rpc(fn,body){
@@ -379,7 +411,7 @@ async function rpc(fn,body){
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];if(!S.rules.event)S.rules.event=ARGO();if(rapikanWarna())setTimeout(()=>{if(CRED)simpan()},0)}
+function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];S.alatMaster=S.alatMaster||[];if(!S.rules.event)S.rules.event=ARGO();if(rapikanWarna())setTimeout(()=>{if(CRED)simpan()},0)}
 function setSync(t){UI.sync=t;const e=document.getElementById('sync');if(e)e.textContent=t}
 async function masuk(u,p){
   const r=await rpc('nw28_load',{p_user:u,p_pass:p,p_have:null});
@@ -603,7 +635,7 @@ async function buatPDF(htmls,nama,pesan,opsi){
       host.innerHTML=html;
       const el=host.firstElementChild,im=host.querySelector('img');if(im&&!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
       // titik potong halaman yang aman: batas bawah tiap baris, supaya teks tidak terbelah
-      const top=el.getBoundingClientRect().top,cut=[...el.querySelectorAll('tr,.detail-list>div,.slip>*,.pdetail>*')].map(x=>Math.round((x.getBoundingClientRect().bottom-top)*SC)).sort((a,b)=>a-b);
+      const top=el.getBoundingClientRect().top,cut=[...el.querySelectorAll('tr,.detail-list>div,.slip>*,.pdetail>*,.pdf-al')].map(x=>Math.round((x.getBoundingClientRect().bottom-top)*SC)).sort((a,b)=>a-b);
       const cv=await window.html2canvas(el,{scale:SC,backgroundColor:'#ffffff'});
       const k=cv.width/w,pageH=Math.floor((PH-2*M)*k);
       for(let y=0;y<cv.height;){
@@ -875,76 +907,203 @@ function vAturan(){
 }
 
 /* ---------- RENDER ---------- */
-/* ---------- ALAT (peminjaman alat per proyek) ---------- */
-const AL_F={semua:'Semua status',pinjam:'Masih dipinjam',kembali:'Sudah kembali'};
+/* ---------- ALAT: master alat (foto & kepemilikan), peminjaman, kondisi, pengembalian ---------- */
+const MILIK={khena:'Khena',kicky:'Kicky',nw28:'NW28'},MILIK_C={khena:'ws',kicky:'ev',nw28:'gr'};
+const KOND=['Baik','Rusak ringan','Rusak berat','Hilang'],KOND_C=['gr','ot','bad','bad'];
+const kIdx=k=>Math.max(0,KOND.indexOf(k||'Baik'));
+const pillKond=k=>k?`<span class="pill ${KOND_C[kIdx(k)]}">${esc(k)}</span>`:'<span class="muted">–</span>';
+const pillMilik=k=>k&&MILIK[k]?`<span class="pill ${MILIK_C[k]}">Milik ${MILIK[k]}</span>`:'';
+const opsiKond=(v,hilang)=>KOND.filter(k=>hilang||k!=='Hilang').map(k=>`<option${k===v?' selected':''}>${k}</option>`).join('');
+const AM=id=>(S.alatMaster||[]).find(m=>m.id===id);
+const namaAlat=a=>{const m=AM(a.mid);return m?m.nama:(a.nama||'?')};
+const turun=a=>!!(a.kembali&&a.kondisiKembali&&kIdx(a.kondisiKembali)>kIdx(a.kondisiPinjam||'Baik'));
+const pinjamAktif=mid=>(S.alat||[]).find(a=>a.mid===mid&&!a.kembali);
+function kondisiTerakhir(mid){
+  const L=(S.alat||[]).filter(a=>a.mid===mid).sort((a,b)=>(a.kembali||a.tgl)<(b.kembali||b.tgl)?1:-1)[0];
+  if(!L)return (AM(mid)||{}).kondisi||'Baik';
+  return L.kembali?(L.kondisiKembali||L.kondisiPinjam||'Baik'):(L.kondisiPinjam||'Baik');
+}
+/* foto: disimpan terpisah di server, di sini hanya id-nya */
+const FOTO={},FULL={},FOTO_ANTRI=new Set();
+const fotoImg=(id,cls,alt)=>id?`<img class="foto ${cls||''}" data-foto="${esc(id)}" src="${FOTO[id]||'data:image/gif;base64,R0lGODlhAQABAAAAACw='}" alt="${esc(alt||'Foto alat')}" data-act="foto-lihat" data-v="${esc(id)}">`:`<span class="foto-kosong ${cls||''}">Tanpa foto</span>`;
+function isiFoto(){
+  const need=[];
+  document.querySelectorAll('img[data-foto]').forEach(i=>{const id=i.dataset.foto;if(FOTO[id])i.src=FOTO[id];else need.push(id)});
+  if(need.length)ambilFoto(need);
+  if(UI.lihat){const im=document.querySelector('.lightbox img');if(im&&(FULL[UI.lihat]||FOTO[UI.lihat]))im.src=FULL[UI.lihat]||FOTO[UI.lihat]}
+}
+async function ambilFoto(ids,full){
+  if(typeof rpc!=='function'||!CRED)return;
+  const C=full?FULL:FOTO,kunci=full?'F:':'T:';
+  ids=[...new Set(ids)].filter(id=>id&&!C[id]&&!FOTO_ANTRI.has(kunci+id));
+  if(!ids.length)return;
+  ids.forEach(i=>FOTO_ANTRI.add(kunci+i));
+  try{for(let i=0;i<ids.length;i+=(full?1:40)){const r=await rpc('nw28_foto_get',{p_user:CRED.u,p_pass:CRED.p,p_ids:ids.slice(i,i+(full?1:40)),p_full:!!full});if(r.status==='ok'&&r.foto)Object.assign(C,r.foto)}}catch(e){}
+  ids.forEach(i=>FOTO_ANTRI.delete(kunci+i));
+  isiFoto();
+}
+function kompres(file,max,q){
+  return new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{const s=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.naturalWidth*s));c.height=Math.max(1,Math.round(im.naturalHeight*s));
+      const g=c.getContext('2d');g.fillStyle='#FFFFFF';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',q))};
+    im.onerror=()=>{URL.revokeObjectURL(u);no(new Error('bukan gambar'))};im.src=u});
+}
+async function unggahFoto(file){
+  const thumb=await kompres(file,360,0.72),full=await kompres(file,1280,0.72);
+  if(typeof rpc!=='function'||!CRED)throw new Error('offline');
+  const id='f'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  const r=await rpc('nw28_foto_put',{p_user:CRED.u,p_pass:CRED.p,p_id:id,p_thumb:thumb,p_full:full});
+  if(r.status!=='ok')throw new Error(r.status);
+  FOTO[id]=thumb;FULL[id]=full;return id;
+}
+document.addEventListener('change',async e=>{
+  const t=e.target;if(!t||!t.dataset||!t.dataset.fotoKey||!t.files||!t.files[0])return;
+  const key=t.dataset.fotoKey,file=t.files[0];t.value='';
+  UI.fotoBaru=UI.fotoBaru||{};UI.fotoBaru[key]='…';render();
+  try{
+    const id=await unggahFoto(file);
+    if(key.startsWith('m')&&AM(+key.slice(1))){const m=AM(+key.slice(1));m.foto=id;stamp('am|'+m.id,'Foto alat '+m.nama);delete UI.fotoBaru[key];toast('Foto alat diganti');ubah();return}
+    UI.fotoBaru[key]=id;toast('Foto tersimpan');
+  }catch(err){delete UI.fotoBaru[key];toast('Foto gagal diunggah. Periksa internet lalu coba lagi.')}
+  render();
+},true);
+function fotoPilih(key,label,dataAda){
+  const v=(UI.fotoBaru||{})[key],ada=v&&v!=='…'?v:dataAda;
+  return `<div class="foto-pilih">${v==='…'?'<span class="foto-kosong thumb">Mengunggah…</span>':ada?fotoImg(ada,'thumb',label):`<span class="foto-kosong thumb">${label}</span>`}
+    <div class="row"><label class="btn small" for="fc-${key}">Kamera</label><label class="btn small" for="fg-${key}">Galeri</label>${v&&v!=='…'?`<button class="btn small" data-act="foto-hapus" data-v="${key}">Hapus foto</button>`:''}</div>
+    <input type="file" accept="image/*" capture="environment" id="fc-${key}" data-foto-key="${key}" hidden><input type="file" accept="image/*" id="fg-${key}" data-foto-key="${key}" hidden></div>`;
+}
+const fotoSiap=key=>{const v=(UI.fotoBaru||{})[key];return v&&v!=='…'?v:null};
+const fotoMasihUnggah=key=>(UI.fotoBaru||{})[key]==='…';
+
+function kartuPinjam(a,kolP){
+  const m=AM(a.mid),p=P(a.pid),w=W(a.wid),tr=turun(a),buka=UI.balik===a.id;
+  return `<div class="al-item${tr?' turun':''}">
+    ${fotoImg(m&&m.foto,'thumb',namaAlat(a))}
+    <div class="al-info">
+      <div class="t"><b>${esc(namaAlat(a))}</b>${a.jumlah>1?`<span class="muted num">×${a.jumlah}</span>`:''}${pillMilik(m&&m.milik)}${a.kembali?`<span class="pill gr">Kembali ${tglPendek(a.kembali)}</span>`:'<span class="pill ot">Dipinjam</span>'}${tr?'<span class="pill bad">Kondisi turun</span>':''}</div>
+      <div class="small muted">${tglPendek(a.tgl)}${kolP?` · ${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'Tanpa proyek'}`:''} · Penerima <b style="color:var(--ink)">${w?esc(w.nama):'–'}</b> · Pemberi ${esc(a.pemberi||'–')}</div>
+      ${!a.kondisiPinjam&&!a.kondisiKembali?'':`<div class="al-kond">Saat dipinjam ${pillKond(a.kondisiPinjam)}${a.catatanPinjam?`<span>${esc(a.catatanPinjam)}</span>`:''}${a.kembali?` <span>→</span> Saat kembali ${pillKond(a.kondisiKembali)}${a.catatanKembali?`<span>${esc(a.catatanKembali)}</span>`:''}`:''}</div>`}
+      ${a.ket?`<div class="small muted">${esc(a.ket)}</div>`:''}
+      ${ed('al|'+a.id)}
+    </div>
+    <div class="al-aksi">
+      ${a.kembali&&a.fotoKembali?fotoImg(a.fotoKembali,'thumb','Foto pengembalian'):''}
+      ${a.kembali?`<button class="btn small" data-act="al-batal" data-id="${a.id}">Batalkan kembali</button>`:buka?'':`<button class="btn pri small" data-act="al-balik" data-id="${a.id}">Kembalikan</button>`}
+      <button class="x" data-act="al-del" data-id="${a.id}" aria-label="Hapus catatan">×</button>
+    </div>
+    ${buka?`<div class="al-panel">
+      <b>Pengembalian ${esc(namaAlat(a))}</b>
+      <div class="row"><label class="row small">Kondisi saat kembali <select id="bk-k" aria-label="Kondisi saat kembali">${opsiKond(fv('bk-k',a.kondisiPinjam||'Baik'),true)}</select></label>
+        <input type="text" id="bk-c" class="grow" value="${esc(fv('bk-c'))}" placeholder="Catatan kondisi, misal mata bor patah" aria-label="Catatan kondisi kembali"></div>
+      <div><div class="label" style="margin-bottom:6px">Foto bukti (opsional)</div>${fotoPilih('k'+a.id,'Foto bukti')}</div>
+      <div class="row"><button class="btn pri" data-act="al-simpan-balik" data-id="${a.id}">Simpan pengembalian</button><button class="btn" data-act="al-balik-batal">Batal</button><span class="small muted">Foto boleh dikosongkan.</span></div>
+    </div>`:''}
+  </div>`;
+}
+function vMaster(){
+  const M=S.alatMaster||[];
+  const form=`<section class="panel kartu"><h3>Tambah alat ke master</h3>
+    <div class="row"><input type="text" id="am-n" class="grow" value="${esc(fv('am-n'))}" placeholder="Nama alat, misal Bor Hammer DongCheng" aria-label="Nama alat">
+      <label class="row small">Milik <select id="am-o" aria-label="Kepemilikan">${Object.keys(MILIK).map(k=>`<option value="${k}"${fv('am-o','nw28')===k?' selected':''}>${MILIK[k]}</option>`).join('')}</select></label></div>
+    <div class="row"><label class="row small">Kondisi sekarang <select id="am-c" aria-label="Kondisi alat">${opsiKond(fv('am-c','Baik'))}</select></label>
+      <input type="text" id="am-k" class="grow" value="${esc(fv('am-k'))}" placeholder="Keterangan (opsional), misal no. seri" aria-label="Keterangan alat"></div>
+    <div><div class="label" style="margin-bottom:6px">Foto alat</div>${fotoPilih('master','Foto alat')}</div>
+    <div class="row"><button class="btn pri" data-act="am-add">+ Simpan ke master</button></div></section>`;
+  const fm=UI.amF||'semua',L=M.filter(m=>fm==='semua'||m.milik===fm);
+  const kartu=L.map(m=>{const a=pinjamAktif(m.id),p=a&&P(a.pid),w=a&&W(a.wid),kt=kondisiTerakhir(m.id);return `<div class="am-card">
+      ${fotoImg(m.foto,'kartu-foto',m.nama)}
+      <input type="text" id="am${m.id}n" data-k="am" data-id="${m.id}" data-f="nama" value="${esc(m.nama)}" aria-label="Nama alat">
+      <div class="row">${pillMilik(m.milik)}${pillKond(kt)}${a?'<span class="pill ot">Dipinjam</span>':'<span class="pill nm">Tersedia</span>'}</div>
+      ${a?`<div class="small muted">Di ${p?esc(p.nama):'–'} oleh <b style="color:var(--ink)">${w?esc(w.nama):'–'}</b> sejak ${tglPendek(a.tgl)}</div>`:''}
+      ${m.ket?`<div class="small muted">${esc(m.ket)}</div>`:''}
+      <div class="row small"><label class="row">Milik <select id="am${m.id}o" data-k="am" data-id="${m.id}" data-f="milik" aria-label="Kepemilikan">${Object.keys(MILIK).map(k=>`<option value="${k}"${m.milik===k?' selected':''}>${MILIK[k]}</option>`).join('')}</select></label></div>
+      <div class="row"><span class="small muted">${m.foto?'Ganti foto':'Tambah foto'}</span><label class="btn small" for="fc-m${m.id}">Kamera</label><label class="btn small" for="fg-m${m.id}">Galeri</label>${(UI.fotoBaru||{})['m'+m.id]==='…'?'<span class="small muted">Mengunggah…</span>':''}<span class="grow"></span><button class="x" data-act="am-del" data-id="${m.id}" aria-label="Hapus dari master">×</button></div>
+      <input type="file" accept="image/*" capture="environment" id="fc-m${m.id}" data-foto-key="m${m.id}" hidden><input type="file" accept="image/*" id="fg-m${m.id}" data-foto-key="m${m.id}" hidden>
+      ${ed('am|'+m.id)}
+    </div>`}).join('');
+  const n=k=>M.filter(m=>m.milik===k).length;
+  return `${form}
+  <div class="chips" role="group" aria-label="Kepemilikan"><span class="small muted">Milik:</span>
+    <button class="chip" data-act="am-f" data-v="semua" aria-pressed="${fm==='semua'}">Semua <span class="n">${M.length}</span></button>
+    ${Object.keys(MILIK).map(k=>`<button class="chip" data-act="am-f" data-v="${k}" aria-pressed="${fm===k}">${MILIK[k]} <span class="n">${n(k)}</span></button>`).join('')}</div>
+  ${L.length?`<div class="am-grid">${kartu}</div>`:`<section class="panel"><p class="muted" style="margin:0">${M.length?'Tidak ada alat untuk pilihan ini.':'Belum ada alat di master. Tambahkan lewat form di atas, lengkap dengan fotonya.'}</p></section>`}`;
+}
+function vAlat(){
+  const view=UI.alatView||'pinjam';
+  const tombol=`<div class="chips" role="group" aria-label="Tampilan"><button class="chip" data-act="al-view" data-v="pinjam" aria-pressed="${view==='pinjam'}">List Peminjaman Alat</button><button class="chip" data-act="al-view" data-v="proyek" aria-pressed="${view==='proyek'}">List Alat (per proyek)</button><button class="chip" data-act="al-view" data-v="master" aria-pressed="${view==='master'}">Master Alat <span class="n">${(S.alatMaster||[]).length}</span></button></div>`;
+  const kepala=`<div><div class="label">Alat kerja</div><h2 style="font-size:24px">Peminjaman alat</h2></div>${tombol}`;
+  if(view==='master')return kepala+vMaster();
+  const semua=(S.alat||[]).slice().sort((a,b)=>a.tgl<b.tgl?1:a.tgl>b.tgl?-1:b.id-a.id);
+  const f=UI.alatF||'semua';
+  const cocok=a=>f==='semua'||(f==='pinjam'?!a.kembali:f==='kembali'?!!a.kembali:turun(a)||(a.kembali&&kIdx(a.kondisiKembali)>0));
+  const L=semua.filter(cocok);
+  const nP=semua.filter(a=>!a.kembali).length,nK=semua.length-nP,nR=semua.filter(a=>turun(a)||(a.kembali&&kIdx(a.kondisiKembali)>0)).length;
+  const M=S.alatMaster||[],selM=+fv('al-m',0),mSel=AM(selM);
+  const form=M.length?`<section class="panel kartu"><h3>Catat peminjaman alat</h3>
+    <div class="row"><select id="al-m" data-k="alm" class="grow" aria-label="Pilih alat dari master"><option value="0">Pilih alat dari master</option>${Object.keys(MILIK).map(k=>{const G=M.filter(m=>m.milik===k);return G.length?`<optgroup label="Milik ${MILIK[k]}">${G.map(m=>`<option value="${m.id}"${m.id===selM?' selected':''}>${esc(m.nama)}${pinjamAktif(m.id)?' (sedang dipinjam)':''}</option>`).join('')}</optgroup>`:''}).join('')}</select>
+      <label class="row small">Jumlah <input type="number" id="al-j" min="1" step="1" inputmode="numeric" value="${esc(fv('al-j','1'))}" style="width:70px" aria-label="Jumlah"></label></div>
+    ${mSel?`<div class="row">${fotoImg(mSel.foto,'thumb',mSel.nama)}<div class="al-info"><b>${esc(mSel.nama)}</b><div class="row">${pillMilik(mSel.milik)}${pillKond(kondisiTerakhir(mSel.id))}${pinjamAktif(mSel.id)?'<span class="pill ot">Masih dipinjam di proyek lain</span>':''}</div></div></div>`:''}
+    <div class="row"><input type="date" id="al-t" value="${esc(fv('al-t',HARI_INI))}" aria-label="Tanggal pinjam">
+      <select id="al-p" aria-label="Proyek"><option value="0">Pilih proyek</option>${opsiProyek(+fv('al-p',0))}</select>
+      <select id="al-w" aria-label="Penerima"><option value="0">Penerima (pekerja)</option>${opsiPekerja(+fv('al-w',0))}</select>
+      <input type="text" id="al-g" list="al-g-list" value="${esc(fv('al-g',UI.user))}" placeholder="Pemberi alat" aria-label="Pemberi alat"><datalist id="al-g-list">${[...new Set([UI.user,...S.workers.filter(w=>w.aktif).map(w=>w.nama)])].map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist></div>
+    <div class="row"><label class="row small">Kondisi saat dipinjam <select id="al-kp" aria-label="Kondisi saat dipinjam">${opsiKond(fv('al-kp',mSel?kondisiTerakhir(mSel.id):'Baik'))}</select></label>
+      <input type="text" id="al-kc" class="grow" value="${esc(fv('al-kc'))}" placeholder="Catatan kondisi (opsional)" aria-label="Catatan kondisi saat dipinjam"></div>
+    <div class="row"><input type="text" id="al-k" class="grow" value="${esc(fv('al-k'))}" placeholder="Keterangan (opsional)" aria-label="Keterangan"><button class="btn pri" data-act="al-add">+ Catat peminjaman</button></div>
+  </section>`:`<section class="panel row"><span class="grow">Belum ada alat di master. Isi dulu Master Alat (nama, kepemilikan, foto), lalu catat peminjaman dari sini.</span><button class="btn pri" data-act="al-view" data-v="master">Buka Master Alat</button></section>`;
+  const status=`<div class="chips" role="group" aria-label="Status"><span class="small muted">Status:</span>
+    <button class="chip" data-act="al-f" data-v="semua" aria-pressed="${f==='semua'}">Semua <span class="n">${semua.length}</span></button>
+    <button class="chip" data-act="al-f" data-v="pinjam" aria-pressed="${f==='pinjam'}">Masih dipinjam <span class="n">${nP}</span></button>
+    <button class="chip" data-act="al-f" data-v="kembali" aria-pressed="${f==='kembali'}">Sudah kembali <span class="n">${nK}</span></button>
+    <button class="chip" data-act="al-f" data-v="rusak" aria-pressed="${f==='rusak'}">Kembali rusak <span class="n">${nR}</span></button>
+    <span class="grow"></span>${L.length?`<button class="btn pri" data-act="al-pdf" data-v="">${view==='pinjam'?'Unduh PDF':'Unduh PDF semua proyek'}</button>`:''}</div>`;
+  let isi;
+  if(!L.length)isi=`<section class="panel"><p class="muted" style="margin:0">${semua.length?'Tidak ada catatan untuk pilihan ini.':'Belum ada peminjaman alat.'}</p></section>`;
+  else if(view==='pinjam')isi=`<div class="al-list">${L.map(a=>kartuPinjam(a,true)).join('')}</div>`;
+  else{
+    const kunci=a=>P(a.pid)?a.pid:0,by=new Map();for(const a of L){const k=kunci(a);if(!by.has(k))by.set(k,[]);by.get(k).push(a)}
+    const urut=[...S.projects.map(p=>p.id).filter(id=>by.has(id)),...(by.has(0)?[0]:[])];
+    isi=urut.map(id=>{const p=P(id),r=by.get(id),ra=semua.filter(a=>kunci(a)===id),np=ra.filter(a=>!a.kembali).length,nr=ra.filter(turun).length;return `<section class="panel kartu">
+      <div class="row"><h3 class="grow">${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'Tanpa proyek'}</h3><span class="pill ot">${np} dipinjam</span><span class="pill gr">${ra.length-np} kembali</span>${nr?`<span class="pill bad">${nr} kondisi turun</span>`:''}<button class="btn" data-act="al-pdf" data-v="${id}">Unduh PDF</button></div>
+      <div class="al-list">${r.map(a=>kartuPinjam(a,false)).join('')}</div></section>`}).join('');
+  }
+  return kepala+(view==='pinjam'?form:'')+status+isi;
+}
+const AL_F={semua:'Semua status',pinjam:'Masih dipinjam',kembali:'Sudah kembali',rusak:'Kembali rusak'};
 function lapAlatHTML(judul,sub,rows,kolP){
-  const lg=logoURL(),np=rows.filter(a=>!a.kembali).length;
+  const lg=logoURL(),np=rows.filter(a=>!a.kembali).length,nr=rows.filter(turun).length;
+  const img=id=>id&&FOTO[id]?`<div class="box"><img src="${FOTO[id]}" alt=""></div>`:'<span class="foto-kosong">Tanpa foto</span>';
   return `<div class="slip lap">
     <div class="slip-head">${lg?`<img src="${lg}" alt="">`:''}<div><div class="label">Daftar peminjaman alat</div><h2>${judul}</h2><div class="small muted">${sub}</div></div>
-      <div style="margin-left:auto;text-align:right"><div class="label">Masih dipinjam</div><div class="big num" style="font-size:28px;color:var(--ot)">${np}</div><div class="small muted">dari ${rows.length} catatan</div></div></div>
-    <table><thead><tr><th>Tanggal</th><th>Alat</th><th class="r">Jumlah</th>${kolP?'<th>Proyek</th>':''}<th>Penerima</th><th>Pemberi</th><th>Status</th></tr></thead>
-    <tbody>${rows.map(a=>{const p=P(a.pid),w=W(a.wid);return `<tr><td>${tglPendek(a.tgl)}</td><td><b>${esc(a.nama)}</b>${a.ket?`<div class="small muted">${esc(a.ket)}</div>`:''}</td><td class="r">${a.jumlah||1}</td>${kolP?`<td>${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'Tanpa proyek'}</td>`:''}<td>${w?esc(w.nama):'–'}</td><td>${esc(a.pemberi||'–')}</td><td>${a.kembali?`<span class="pill gr">Kembali ${tglPendek(a.kembali)}</span>`:'<span class="pill ot">Dipinjam</span>'}</td></tr>`}).join('')}</tbody></table>
+      <div style="margin-left:auto;text-align:right"><div class="label">Masih dipinjam</div><div class="big num" style="font-size:28px;color:var(--ot)">${np}</div><div class="small muted">dari ${rows.length} catatan${nr?` · ${nr} kondisi turun`:''}</div></div></div>
+    ${rows.map(a=>{const m=AM(a.mid),p=P(a.pid),w=W(a.wid);return `<div class="pdf-al${turun(a)?' turun':''}">
+      <div class="pf">${img(m&&m.foto)}<span class="cap">Foto alat</span></div>
+      <div class="pi"><div><b style="font-size:16px">${esc(namaAlat(a))}</b>${a.jumlah>1?` ×${a.jumlah}`:''} ${pillMilik(m&&m.milik)}</div>
+        <div>Tanggal pinjam: <b>${tglPanjang(a.tgl)}</b></div>
+        ${kolP?`<div>Proyek: <b>${p?esc(p.nama):'Tanpa proyek'}</b></div>`:''}
+        <div>Penerima: <b>${w?esc(w.nama):'–'}</b> · Pemberi: <b>${esc(a.pemberi||'–')}</b></div>
+        <div>Kondisi saat dipinjam: ${pillKond(a.kondisiPinjam)} ${a.catatanPinjam?esc(a.catatanPinjam):''}</div>
+        <div>Status: ${a.kembali?`<span class="pill gr">Kembali ${tglPendek(a.kembali)}</span>`:'<span class="pill ot">Masih dipinjam</span>'}${turun(a)?' <span class="pill bad">Kondisi turun</span>':''}</div>
+        ${a.kembali?`<div>Kondisi saat kembali: ${pillKond(a.kondisiKembali)} ${a.catatanKembali?esc(a.catatanKembali):''}</div>`:''}
+        ${a.ket?`<div class="small muted">${esc(a.ket)}</div>`:''}</div>
+      <div class="pf">${a.kembali?img(a.fotoKembali):'<span class="foto-kosong">Belum kembali</span>'}<span class="cap">Foto pengembalian</span></div>
+    </div>`}).join('')}
     <div class="small muted">Dibuat ${jamEdit(Date.now())} oleh ${esc(UI.user)} · NW28 Absensi · Natawira Dwi Ashta</div>
   </div>`;
 }
-function unduhAlat(v){
+async function unduhAlat(v){
   const f=UI.alatF||'semua',view=UI.alatView||'pinjam';
-  const L=(S.alat||[]).slice().sort((a,b)=>a.tgl<b.tgl?1:a.tgl>b.tgl?-1:b.id-a.id).filter(a=>f==='semua'||(f==='pinjam'?!a.kembali:!!a.kembali));
+  const L=(S.alat||[]).slice().sort((a,b)=>a.tgl<b.tgl?1:a.tgl>b.tgl?-1:b.id-a.id).filter(a=>f==='semua'||(f==='pinjam'?!a.kembali:f==='kembali'?!!a.kembali:turun(a)||(a.kembali&&kIdx(a.kondisiKembali)>0)));
   if(!L.length){toast('Tidak ada catatan alat untuk diunduh');return}
+  toast('Menyiapkan foto untuk PDF…');
+  await ambilFoto(L.flatMap(a=>[(AM(a.mid)||{}).foto,a.fotoKembali]).filter(Boolean));
   const sub=`${AL_F[f]} · per ${tglPanjang(HARI_INI)}`,kunci=a=>P(a.pid)?a.pid:0,nm=id=>id?P(id).nama:'Tanpa proyek';
   if(v!==''){const id=+v,r=L.filter(a=>kunci(a)===id);if(!r.length){toast('Tidak ada catatan untuk proyek ini');return}
     return buatPDF([lapAlatHTML(esc(nm(id)),sub,r,false)],`Alat-${slug(nm(id))}_${HARI_INI}.pdf`,'PDF alat diunduh')}
   if(view==='pinjam')return buatPDF([lapAlatHTML('Semua proyek',sub,L,true)],`Alat-semua-proyek_${HARI_INI}.pdf`,'PDF alat diunduh');
   const ids=[...S.projects.map(p=>p.id).filter(id=>L.some(a=>kunci(a)===id)),...(L.some(a=>kunci(a)===0)?[0]:[])];
   buatPDF(ids.map(id=>lapAlatHTML(esc(nm(id)),sub,L.filter(a=>kunci(a)===id),false)),`Alat-per-proyek_${HARI_INI}.pdf`,`PDF berisi ${ids.length} proyek diunduh`);
-}
-function vAlat(){
-  const semua=(S.alat||[]).slice().sort((a,b)=>a.tgl<b.tgl?1:a.tgl>b.tgl?-1:b.id-a.id);
-  const f=UI.alatF||'semua',view=UI.alatView||'pinjam';
-  const L=semua.filter(a=>f==='semua'||(f==='pinjam'?!a.kembali:!!a.kembali));
-  const nP=semua.filter(a=>!a.kembali).length,nK=semua.length-nP;
-  const baris=(a,kolP)=>{const p=P(a.pid),w=W(a.wid);return `<tr>
-    <td class="num">${tglPendek(a.tgl)}</td>
-    <td><b>${esc(a.nama)}</b>${a.jumlah>1?` <span class="muted num">×${a.jumlah}</span>`:''}${a.ket?`<div class="small muted">${esc(a.ket)}</div>`:''}</td>
-    ${kolP?`<td>${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'<span class="muted">Tanpa proyek</span>'}</td>`:''}
-    <td>${w?esc(w.nama):'<span class="muted">–</span>'}</td>
-    <td>${a.pemberi?esc(a.pemberi):'<span class="muted">–</span>'}</td>
-    <td>${a.kembali?`<span class="pill gr">Kembali ${tglPendek(a.kembali)}</span> <button class="btn small" data-act="al-batal" data-id="${a.id}">Batal</button>`:`<span class="pill ot">Dipinjam</span> <button class="btn small" data-act="al-kembali" data-id="${a.id}">Tandai kembali</button>`}${ed('al|'+a.id)}</td>
-    <td><button class="x" data-act="al-del" data-id="${a.id}" aria-label="Hapus catatan">×</button></td></tr>`};
-  const tabel=(rows,kolP)=>`<div class="tbl"><table><thead><tr><th>Tanggal</th><th>Alat</th>${kolP?'<th>Proyek</th>':''}<th>Penerima</th><th>Pemberi</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(a=>baris(a,kolP)).join('')}</tbody></table></div>`;
-  const nama=[...new Set([UI.user,...S.workers.filter(w=>w.aktif).map(w=>w.nama)])];
-  const form=`<section class="panel kartu"><h3>Catat peminjaman alat</h3>
-    <div class="row">
-      <input type="date" id="al-t" value="${esc(fv('al-t',HARI_INI))}" aria-label="Tanggal pinjam">
-      <input type="text" id="al-n" class="grow" value="${esc(fv('al-n'))}" placeholder="Nama alat, misal Bor listrik Makita" aria-label="Nama alat">
-      <label class="row small">Jumlah <input type="number" id="al-j" min="1" step="1" inputmode="numeric" value="${esc(fv('al-j','1'))}" style="width:80px" aria-label="Jumlah"></label>
-    </div>
-    <div class="row">
-      <select id="al-p" aria-label="Proyek"><option value="0">Pilih proyek</option>${opsiProyek(+fv('al-p',0))}</select>
-      <select id="al-w" aria-label="Penerima"><option value="0">Penerima (pekerja)</option>${opsiPekerja(+fv('al-w',0))}</select>
-      <input type="text" id="al-g" list="al-g-list" value="${esc(fv('al-g',UI.user))}" placeholder="Pemberi alat" aria-label="Pemberi alat"><datalist id="al-g-list">${nama.map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist>
-      <input type="text" id="al-k" class="grow" value="${esc(fv('al-k'))}" placeholder="Keterangan (opsional)" aria-label="Keterangan">
-      <button class="btn pri" data-act="al-add">+ Catat peminjaman</button>
-    </div></section>`;
-  let isi;
-  if(!L.length)isi=`<section class="panel"><p class="muted" style="margin:0">${semua.length?'Tidak ada catatan untuk pilihan ini.':'Belum ada peminjaman alat. Catat yang pertama lewat form di atas.'}</p></section>`;
-  else if(view==='pinjam')isi=`<section class="panel">${tabel(L,true)}</section>`;
-  else{
-    const by=new Map();for(const a of L){const k=P(a.pid)?a.pid:0;if(!by.has(k))by.set(k,[]);by.get(k).push(a)}
-    const urut=[...S.projects.map(p=>p.id).filter(id=>by.has(id)),...(by.has(0)?[0]:[])];
-    isi=urut.map(id=>{const p=P(id),r=by.get(id),ra=semua.filter(a=>(P(a.pid)?a.pid:0)===id),np=ra.filter(a=>!a.kembali).length;return `<section class="panel kartu">
-      <div class="row"><h3 class="grow">${p?`<i class="dot" style="background:${p.warna}"></i> ${esc(p.nama)}`:'Tanpa proyek'}</h3><span class="pill ot">${np} dipinjam</span><span class="pill gr">${ra.length-np} kembali</span><button class="btn" data-act="al-pdf" data-v="${id}">Unduh PDF</button></div>
-      ${tabel(r,false)}</section>`}).join('');
-  }
-  return `<div><div class="label">Alat kerja</div><h2 style="font-size:24px">Peminjaman alat</h2></div>
-  <div class="chips" role="group" aria-label="Tampilan"><button class="chip" data-act="al-view" data-v="pinjam" aria-pressed="${view==='pinjam'}">List Peminjaman Alat</button><button class="chip" data-act="al-view" data-v="proyek" aria-pressed="${view==='proyek'}">List Alat (per proyek)</button></div>
-  ${view==='pinjam'?form:''}
-  <div class="chips" role="group" aria-label="Status"><span class="small muted">Status:</span>
-    <button class="chip" data-act="al-f" data-v="semua" aria-pressed="${f==='semua'}">Semua <span class="n">${semua.length}</span></button>
-    <button class="chip" data-act="al-f" data-v="pinjam" aria-pressed="${f==='pinjam'}">Masih dipinjam <span class="n">${nP}</span></button>
-    <button class="chip" data-act="al-f" data-v="kembali" aria-pressed="${f==='kembali'}">Sudah kembali <span class="n">${nK}</span></button>
-    <span class="grow"></span>${L.length?`<button class="btn pri" data-act="al-pdf" data-v="">${view==='pinjam'?'Unduh PDF':'Unduh PDF semua proyek'}</button>`:''}</div>
-  ${isi}`;
 }
 const TABS=[['absensi','Absensi'],['gaji','Gaji'],['proyek','Proyek'],['alat','Alat'],['pekerja','Pekerja'],['aturan','Aturan']];
 const VIEW={absensi:vAbsensi,gaji:vGaji,proyek:vProyek,alat:vAlat,pekerja:vPekerja,aturan:vAturan};
@@ -954,7 +1113,7 @@ function render(){
   who.innerHTML=`<span id="sync">${esc(UI.sync)}</span><span>Masuk sebagai <b>${esc(UI.user)}</b></span><button data-act="keluar">Keluar</button>`;
   document.getElementById('tabs').innerHTML=TABS.map(([k,l])=>`<button data-act="tab" data-tab="${k}"${UI.tab===k?' aria-current="page"':''}>${l}</button>`).join('');
   document.getElementById('stripe').innerHTML=S.projects.filter(p=>p.aktif).map(p=>`<i style="background:${p.warna}"></i>`).join('');
-  document.getElementById('app').innerHTML=VIEW[UI.tab]()+'<footer class="foot"><i class="lg-mark" aria-hidden="true"></i><span>Natawira Dwi Ashta</span></footer>';
+  document.getElementById('app').innerHTML=VIEW[UI.tab]()+'<footer class="foot"><i class="lg-mark" aria-hidden="true"></i><span>Natawira Dwi Ashta</span></footer>'+(UI.lihat?`<div class="lightbox" data-act="foto-tutup"><img src="${FULL[UI.lihat]||FOTO[UI.lihat]||''}" alt="Foto"><span>Ketuk di mana saja untuk menutup</span></div>`:'');isiFoto();
 }
 function ubah(){simpan();render()}
 const nid=()=>S.nid++;
@@ -1042,23 +1201,46 @@ document.addEventListener('click',e=>{
       if(!UI.wa||!UI.wa.file)return;
       navigator.share({files:[UI.wa.file],title:UI.wa.file.name,text:UI.wa.teks}).catch(e=>{if(e&&e.name!=='AbortError')toast('Gagal membuka menu bagikan. Pakai tombol Buka WhatsApp.')});return}
     case 'al-pdf':unduhAlat(t.dataset.v);return;
-    case 'al-view':UI.alatView=t.dataset.v;render();return;
+    case 'al-view':UI.alatView=t.dataset.v;UI.balik=null;render();window.scrollTo(0,0);return;
     case 'al-f':UI.alatF=t.dataset.v;render();return;
+    case 'am-f':UI.amF=t.dataset.v;render();return;
+    case 'foto-lihat':UI.lihat=t.dataset.v;render();ambilFoto([UI.lihat],true);return;
+    case 'foto-tutup':UI.lihat=null;render();return;
+    case 'foto-hapus':if(UI.fotoBaru)delete UI.fotoBaru[t.dataset.v];render();return;
+    case 'am-add':{
+      const n=document.getElementById('am-n').value.trim();if(!n){toast('Isi nama alat');return}
+      if(fotoMasihUnggah('master')){toast('Tunggu foto selesai diunggah');return}
+      const mid=nid();S.alatMaster=S.alatMaster||[];
+      S.alatMaster.push({id:mid,nama:n,milik:document.getElementById('am-o').value,kondisi:document.getElementById('am-c').value,foto:fotoSiap('master'),ket:document.getElementById('am-k').value.trim()});
+      delete (UI.fotoBaru||{}).master;fclear('am-n','am-k','am-c');stamp('am|'+mid,'Master alat '+n);toast(`${n} masuk master alat`);break}
+    case 'am-del':{
+      const m=AM(id);if(!m)return;
+      if((S.alat||[]).some(a=>a.mid===id)){toast('Alat ini sudah punya riwayat peminjaman, jadi tidak bisa dihapus.');return}
+      catat('Menghapus master alat '+m.nama);S.alatMaster=S.alatMaster.filter(x=>x.id!==id);break}
     case 'al-add':{
       const g=i=>document.getElementById(i).value;
-      const tgl=g('al-t'),n=g('al-n').trim(),pid=+g('al-p'),wid=+g('al-w'),jm=Math.max(1,Math.round(+g('al-j')||1));
-      if(!tgl||!n){toast('Isi tanggal dan nama alat');return}
+      const mid=+g('al-m'),tgl=g('al-t'),pid=+g('al-p'),wid=+g('al-w'),jm=Math.max(1,Math.round(+g('al-j')||1)),m=AM(mid);
+      if(!m){toast('Pilih alat dari master');return}
+      if(!tgl){toast('Isi tanggal pinjam');return}
       if(!pid){toast('Pilih proyek yang meminjam alat');return}
       if(!wid){toast('Pilih pekerja penerima alat');return}
       const aid=nid();S.alat=S.alat||[];
-      S.alat.push({id:aid,tgl,nama:n,jumlah:jm,pid,wid,pemberi:g('al-g').trim(),ket:g('al-k').trim(),kembali:null});
-      stamp('al|'+aid,'Pinjam alat '+n);fclear('al-n','al-j','al-k');toast(`${n} dicatat dipinjam oleh ${W(wid).nama}`);break}
-    case 'al-kembali':case 'al-batal':{
+      S.alat.push({id:aid,tgl,mid,nama:m.nama,jumlah:jm,pid,wid,pemberi:g('al-g').trim(),kondisiPinjam:g('al-kp'),catatanPinjam:g('al-kc').trim(),ket:g('al-k').trim(),kembali:null});
+      stamp('al|'+aid,'Pinjam alat '+m.nama);fclear('al-m','al-j','al-kp','al-kc','al-k');toast(`${m.nama} dicatat dipinjam oleh ${W(wid).nama}`);break}
+    case 'al-balik':UI.balik=id;fclear('bk-k','bk-c');render();return;
+    case 'al-balik-batal':UI.balik=null;render();return;
+    case 'al-simpan-balik':{
       const a=(S.alat||[]).find(x=>x.id===id);if(!a)return;
-      a.kembali=act==='al-kembali'?HARI_INI:null;stamp('al|'+id,(a.kembali?'Alat kembali ':'Batal kembali ')+a.nama);break}
+      if(fotoMasihUnggah('k'+id)){toast('Tunggu foto selesai diunggah');return}
+      a.kembali=HARI_INI;a.kondisiKembali=document.getElementById('bk-k').value;a.catatanKembali=document.getElementById('bk-c').value.trim();a.fotoKembali=fotoSiap('k'+id);
+      if(UI.fotoBaru)delete UI.fotoBaru['k'+id];UI.balik=null;fclear('bk-k','bk-c');
+      stamp('al|'+id,'Alat kembali '+namaAlat(a));toast(turun(a)?`${namaAlat(a)} kembali dengan kondisi turun (${a.kondisiKembali})`:`${namaAlat(a)} dicatat sudah kembali`);break}
+    case 'al-batal':{
+      const a=(S.alat||[]).find(x=>x.id===id);if(!a)return;
+      a.kembali=null;a.kondisiKembali=null;a.catatanKembali='';a.fotoKembali=null;stamp('al|'+id,'Batal kembali '+namaAlat(a));break}
     case 'al-del':{
       const a=(S.alat||[]).find(x=>x.id===id);if(!a)return;
-      catat('Menghapus catatan alat '+a.nama);S.alat=S.alat.filter(x=>x.id!==id);break}
+      catat('Menghapus catatan alat '+namaAlat(a));S.alat=S.alat.filter(x=>x.id!==id);break}
     case 'add-grup':{
       const n=document.getElementById('ng-n').value.trim();if(!n){toast('Isi nama grup');return}
       const gid=nid();stamp('g|'+gid,'Grup '+n);(S.grup=S.grup||[]).push({id:gid,nama:n,aturan:document.getElementById('ng-a').value});
@@ -1091,6 +1273,8 @@ document.addEventListener('change',e=>{
     if(f==='ist')r.ist[+t.dataset.i][+t.dataset.j]=+v;else if(f==='dobel')r.dobel=v;else if(f==='ganti')r.ganti=v==='1';else r[f]=+v;
     if(r.selesai<=r.mulai)toast('Jam selesai normal harus setelah jam mulai')}
   else if(k==='g'){const g=GR(id);if(!g)return;stamp('g|'+id,'Grup '+g.nama);if(f==='nama')g.nama=v.trim()||g.nama;else{g.aturan=v;for(const w of S.workers)if(w.grup===id)w.tipe=v}}
+  else if(k==='alm'){render();return}
+  else if(k==='am'){const m=AM(id);if(!m)return;stamp('am|'+id,'Master alat '+m.nama);if(f==='nama')m.nama=v.trim()||m.nama;else m[f]=v}
   else if(k==='kas'){const x=S.kasbon.find(q=>q.id===id);if(!x)return;x.pid=+v||null;stamp('k|'+id,'Kasbon '+((W(x.wid)||{}).nama||''))}
   else if(k==='ui'){if(!v)return;UI[f]=v;if(f==='tgl')UI.pilih.clear();if(UI.dari>UI.sampai){if(f==='dari')UI.sampai=v;else UI.dari=v}render();return}
   else if(k==='prj'){v?UI.prj.add(id):UI.prj.delete(id);render();return}
