@@ -32,3 +32,8 @@ insert into public.nw28_users (username, pass_hash)
 values ('nama', extensions.crypt('password', extensions.gen_salt('bf', 10)))
 on conflict (username) do update set pass_hash = excluded.pass_hash;
 ```
+
+## Peran pengguna
+
+- `admin`: akses penuh (khena, kicky, irwan, karsana).
+- `gudang`: hanya tab Alat (juhara). Server tidak mengirim data gaji/absensi ke akun ini dan hanya menerima perubahan bagian alat.

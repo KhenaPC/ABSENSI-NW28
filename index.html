@@ -411,17 +411,17 @@ async function rpc(fn,body){
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];S.alatMaster=S.alatMaster||[];if(!S.rules.event)S.rules.event=ARGO();if(rapikanWarna())setTimeout(()=>{if(CRED)simpan()},0)}
+function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];S.alatMaster=S.alatMaster||[];if(!S.rules.event)S.rules.event=ARGO();if(rapikanWarna()&&UI.role!=='gudang')setTimeout(()=>{if(CRED)simpan()},0)}
 function setSync(t){UI.sync=t;const e=document.getElementById('sync');if(e)e.textContent=t}
 async function masuk(u,p){
   const r=await rpc('nw28_load',{p_user:u,p_pass:p,p_have:null});
   if(r.status!=='ok')return r.status;
-  pakai(r.data);VER=r.version;CRED={u,p};UI.user=u;UI.sync='Tersimpan';
+  UI.role=r.role||'admin';pakai(r.data);VER=r.version;CRED={u,p};UI.user=u;UI.sync='Tersimpan';
   try{sessionStorage.setItem(KEY+'-cred',JSON.stringify(CRED))}catch(e){}
   return 'ok';
 }
 function keluar(pesan){
-  CRED=null;UI.user='';dirty=false;clearTimeout(saveT);S=kosong();UI.loginErr=pesan||'';
+  CRED=null;UI.user='';UI.role='';dirty=false;clearTimeout(saveT);S=kosong();UI.loginErr=pesan||'';
   try{sessionStorage.removeItem(KEY+'-cred')}catch(e){}
   render();
 }
@@ -1110,8 +1110,9 @@ const VIEW={absensi:vAbsensi,gaji:vGaji,proyek:vProyek,alat:vAlat,pekerja:vPeker
 function render(){
   const who=document.getElementById('who');
   if(!UI.user){document.getElementById('tabs').innerHTML='';who.innerHTML='';document.getElementById('stripe').innerHTML='';document.getElementById('app').innerHTML=vLogin();return}
-  who.innerHTML=`<span id="sync">${esc(UI.sync)}</span><span>Masuk sebagai <b>${esc(UI.user)}</b></span><button data-act="keluar">Keluar</button>`;
-  document.getElementById('tabs').innerHTML=TABS.map(([k,l])=>`<button data-act="tab" data-tab="${k}"${UI.tab===k?' aria-current="page"':''}>${l}</button>`).join('');
+  who.innerHTML=`<span id="sync">${esc(UI.sync)}</span><span>Masuk sebagai <b>${esc(UI.user)}</b>${UI.role==='gudang'?' · Kepala gudang':''}</span><button data-act="keluar">Keluar</button>`;
+  if(UI.role==='gudang')UI.tab='alat';
+  document.getElementById('tabs').innerHTML=(UI.role==='gudang'?TABS.filter(t=>t[0]==='alat'):TABS).map(([k,l])=>`<button data-act="tab" data-tab="${k}"${UI.tab===k?' aria-current="page"':''}>${l}</button>`).join('');
   document.getElementById('stripe').innerHTML=S.projects.filter(p=>p.aktif).map(p=>`<i style="background:${p.warna}"></i>`).join('');
   document.getElementById('app').innerHTML=VIEW[UI.tab]()+'<footer class="foot"><i class="lg-mark" aria-hidden="true"></i><span>Natawira Dwi Ashta</span></footer>'+(UI.lihat?`<div class="lightbox" data-act="foto-tutup"><img src="${FULL[UI.lihat]||FOTO[UI.lihat]||''}" alt="Foto"><span>Ketuk di mana saja untuk menutup</span></div>`:'');isiFoto();
 }
