@@ -240,6 +240,8 @@ img.foto{display:block;object-fit:cover;border-radius:10px;background:var(--surf
 .seg-b+.seg-b{border-left:1px solid var(--line)}
 .seg-b.on.bad{background:var(--bad-soft);color:var(--bad)}
 .seg-b.on.ok{background:var(--ok-soft);color:var(--ok)}
+.seg-b.on.putih{background:#FFFFFF;color:#111111}
+.pill.putih{background:#FFFFFF;color:#111111;border:1px solid #D7DDED}
 #toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:20;max-width:calc(100% - 32px);text-align:center}
 @media (prefers-reduced-motion:no-preference){.blk{transition:left .2s,width .2s}}
 </style>
@@ -827,7 +829,7 @@ function vProyek(){
       <input type="color" id="p${p.id}c" data-k="p" data-id="${p.id}" data-f="warna" value="${p.warna}" aria-label="Warna proyek">
       <input type="text" id="p${p.id}n" class="grow" data-k="p" data-id="${p.id}" data-f="nama" value="${esc(p.nama)}" aria-label="Nama proyek">
       <label class="row small"><input type="checkbox" id="p${p.id}a" data-k="p" data-id="${p.id}" data-f="aktif"${p.aktif?' checked':''}> Aktif</label>
-      <span class="seg" role="group" aria-label="Setoran admin ${esc(p.nama)}"><button class="seg-b${p.admin?'':' on bad'}" data-act="p-admin" data-id="${p.id}" data-v="0" aria-pressed="${!p.admin}">Belum setor admin</button><button class="seg-b${p.admin?' on ok':''}" data-act="p-admin" data-id="${p.id}" data-v="1" aria-pressed="${!!p.admin}">Sudah setor admin${p.admin&&p.adminTgl?` · ${tglPendek(p.adminTgl)}`:''}</button></span>
+      <span class="seg" role="group" aria-label="Setoran admin ${esc(p.nama)}">${(()=>{const st=adminSt(p);return `<button class="seg-b${st==='belum'?' on bad':''}" data-act="p-admin" data-id="${p.id}" data-v="belum" aria-pressed="${st==='belum'}">Belum setor admin</button><button class="seg-b${st==='sudah'?' on ok':''}" data-act="p-admin" data-id="${p.id}" data-v="sudah" aria-pressed="${st==='sudah'}">Sudah setor admin${st==='sudah'&&p.adminTgl?` · ${tglPendek(p.adminTgl)}`:''}</button><button class="seg-b${st==='tidak'?' on putih':''}" data-act="p-admin" data-id="${p.id}" data-v="tidak" aria-pressed="${st==='tidak'}">Tidak setor</button>`})()}</span>
       ${ed('p|'+p.id)}<button class="x" data-act="del-proj" data-id="${p.id}" aria-label="Hapus proyek">×</button>
     </div>`).join('');
   return `${periodeBar('Biaya tenaga kerja per proyek')}
@@ -835,7 +837,7 @@ function vProyek(){
     ${list.length?`<div class="row"><label class="row small"><input type="checkbox" id="pj-semua" data-k="prj-semua"${list.every(o=>UI.prj.has(o.p.id))?' checked':''}> Pilih semua proyek</label><span class="grow"></span><button class="btn pri" data-act="pdf-p-pilih">Unduh PDF (${list.filter(o=>UI.prj.has(o.p.id)).length} terpilih)</button></div>${bars}<div class="row small muted"><span class="grow">Klik proyek untuk melihat rincian. Batang polos = jam normal, batang bergaris = lembur.</span><span class="num">Upah ${rp(tot)}${totK?` − kasbon proyek ${rp(totK)}`:''} = nilai semua proyek <b style="color:var(--ink)">${rp(tot-totK)}</b></span></div>`:'<p class="muted">Belum ada absensi di periode ini.</p>'}
   </section>
   <section class="panel kartu">
-    <div class="row"><h3 class="grow">Daftar proyek</h3>${(()=>{const A=S.projects.filter(p=>p.aktif),n=A.filter(p=>p.admin).length;return `<span class="pill gr">${n} sudah setor admin</span><span class="pill bad">${A.length-n} belum setor</span><span class="small muted">dari ${A.length} proyek aktif</span>`})()}</div>
+    <div class="row"><h3 class="grow">Daftar proyek</h3>${(()=>{const A=S.projects.filter(p=>p.aktif),c=k=>A.filter(p=>adminSt(p)===k).length;return `<span class="pill gr">${c('sudah')} sudah setor admin</span><span class="pill bad">${c('belum')} belum setor</span><span class="pill putih">${c('tidak')} tidak setor</span><span class="small muted">dari ${A.length} proyek aktif</span>`})()}</div>
     ${master}
     <div class="row"><input type="text" id="np-n" value="${esc(fv('np-n'))}" class="grow" placeholder="Nama proyek baru" aria-label="Nama proyek baru"><button class="btn pri" data-act="add-proj">+ Tambah proyek</button></div>
   </section>`;
@@ -920,6 +922,7 @@ const kIdx=k=>Math.max(0,KOND.indexOf(k||'Baik'));
 const pillKond=k=>k?`<span class="pill ${KOND_C[kIdx(k)]}">${esc(k)}</span>`:'<span class="muted">–</span>';
 const pillMilik=k=>k&&MILIK[k]?`<span class="pill ${MILIK_C[k]}">Milik ${MILIK[k]}</span>`:'';
 const opsiKond=(v,hilang)=>KOND.filter(k=>hilang||k!=='Hilang').map(k=>`<option${k===v?' selected':''}>${k}</option>`).join('');
+const adminSt=p=>p.adminSt||(p.admin?'sudah':'belum');
 const AM=id=>(S.alatMaster||[]).find(m=>m.id===id);
 const namaAlat=a=>{const m=AM(a.mid);return m?m.nama:(a.nama||'?')};
 const turun=a=>!!(a.kembali&&a.kondisiKembali&&kIdx(a.kondisiKembali)>kIdx(a.kondisiPinjam||'Baik'));
@@ -1207,7 +1210,7 @@ document.addEventListener('click',e=>{
     case 'wa-share':{
       if(!UI.wa||!UI.wa.file)return;
       navigator.share({files:[UI.wa.file],title:UI.wa.file.name,text:UI.wa.teks}).catch(e=>{if(e&&e.name!=='AbortError')toast('Gagal membuka menu bagikan. Pakai tombol Buka WhatsApp.')});return}
-    case 'p-admin':{const p=P(id);if(!p)return;const v=t.dataset.v==='1';if(!!p.admin===v)return;p.admin=v;p.adminTgl=v?HARI_INI:null;stamp('p|'+id,(v?'Sudah setor admin ':'Belum setor admin ')+p.nama);break}
+    case 'p-admin':{const p=P(id);if(!p)return;const v=t.dataset.v;if(adminSt(p)===v)return;p.adminSt=v;p.admin=v==='sudah';p.adminTgl=v==='sudah'?HARI_INI:null;stamp('p|'+id,({sudah:'Sudah setor admin ',belum:'Belum setor admin ',tidak:'Tidak setor admin '})[v]+p.nama);break}
     case 'al-pdf':unduhAlat(t.dataset.v);return;
     case 'al-view':UI.alatView=t.dataset.v;UI.balik=null;render();window.scrollTo(0,0);return;
     case 'al-f':UI.alatF=t.dataset.v;render();return;
