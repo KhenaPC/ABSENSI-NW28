@@ -848,7 +848,7 @@ function vProyek(){
 
 /* ---------- PEKERJA ---------- */
 function vPekerja(){
-  const rows=S.workers.map(w=>`<tr>
+  const rows=S.workers.filter(w=>!w.hapus).map(w=>`<tr>
     <td><input type="text" id="w${w.id}n" data-k="w" data-id="${w.id}" data-f="nama" value="${esc(w.nama)}" aria-label="Nama" style="width:150px">${ed('w|'+w.id)}</td>
     <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="grup" aria-label="Grup">${opsiGrup(w.grup?'grp:'+w.grup:w.tipe,true)}</select></td>
     <td><input type="number" id="w${w.id}u" min="0" step="5000" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="upah" value="${w.upah}" aria-label="Upah harian"></td>
@@ -861,11 +861,12 @@ function vPekerja(){
   <section class="panel">
     <div class="tbl"><table class="tbl-pekerja"><thead><tr><th>Nama</th><th>Grup</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th><th>Status</th><th></th><th>No. WA</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="small muted">Upah dan tarif lembur diisi manual per orang. Semua hitungan di tab lain mengikuti otomatis.</p>
+    ${(()=>{const D=S.workers.filter(w=>w.hapus);return D.length?`<details class="small"><summary class="muted" style="cursor:pointer">Pekerja yang dihapus (${D.length}) · data absensi & gaji lamanya tetap tersimpan</summary><div class="kartu" style="margin-top:8px">${D.map(w=>`<div class="blok"><b>${esc(w.nama)}</b><span class="pill ${PC[w.tipe]}">${esc(grupNama(w))}</span><span class="muted grow">dihapus${w.hapusTgl?' '+tglPendek(w.hapusTgl):''}</span>${ed('w|'+w.id)}<button class="btn small" data-act="pulih-w" data-id="${w.id}">Pulihkan</button></div>`).join('')}</div></details>`:''})()}
   </section>
   <section class="panel kartu">
     <h3>Grup tukang</h3>
     <p class="small muted" style="margin:0">Grup bawaan: Workshop NW28, Tim Garut, dan Event. Grup baru memakai aturan upah salah satu grup bawaan, dan namanya tampil di absensi, gaji, proyek, serta PDF.</p>
-    ${(S.grup||[]).map(g=>{const n=S.workers.filter(w=>w.grup===g.id).length;return `<div class="blok"><span class="pill ${PC[g.aturan]}">${esc(g.nama)}</span><input type="text" id="g${g.id}n" class="grow" data-k="g" data-id="${g.id}" data-f="nama" value="${esc(g.nama)}" aria-label="Nama grup"><label class="tarif">Aturan <select id="g${g.id}a" data-k="g" data-id="${g.id}" data-f="aturan">${opsiTipe(g.aturan)}</select></label><span class="small muted">${n} pekerja</span>${ed('g|'+g.id)}<button class="x" data-act="del-grup" data-id="${g.id}" aria-label="Hapus grup">×</button></div>`}).join('')}
+    ${(S.grup||[]).map(g=>{const n=S.workers.filter(w=>w.grup===g.id&&!w.hapus).length;return `<div class="blok"><span class="pill ${PC[g.aturan]}">${esc(g.nama)}</span><input type="text" id="g${g.id}n" class="grow" data-k="g" data-id="${g.id}" data-f="nama" value="${esc(g.nama)}" aria-label="Nama grup"><label class="tarif">Aturan <select id="g${g.id}a" data-k="g" data-id="${g.id}" data-f="aturan">${opsiTipe(g.aturan)}</select></label><span class="small muted">${n} pekerja</span>${ed('g|'+g.id)}<button class="x" data-act="del-grup" data-id="${g.id}" aria-label="Hapus grup">×</button></div>`}).join('')}
     <div class="row"><input type="text" id="ng-n" value="${esc(fv('ng-n'))}" class="grow" placeholder="Nama grup baru, misal Tim Cikarang" aria-label="Nama grup baru"><label class="row small">Pakai aturan <select id="ng-a" aria-label="Aturan grup baru">${opsiTipe(fv('ng-a','workshop'))}</select></label><button class="btn pri" data-act="add-grup">+ Tambah grup</button></div>
   </section>
   <section class="panel kartu">
@@ -1266,8 +1267,12 @@ document.addEventListener('click',e=>{
       const n=document.getElementById('nw-n').value.trim(),u=+document.getElementById('nw-u').value,l=+document.getElementById('nw-l').value;
       if(!n||!(u>0)){toast('Isi nama dan upah harian');return}
       const wid=nid();stamp('w|'+wid,'Pekerja '+n);const nw={id:wid,nama:n,tipe:'workshop',grup:null,upah:u,lembur:l>0?l:0,aktif:true};UI.nwGrup=document.getElementById('nw-t').value;setGrup(nw,UI.nwGrup);const wa=normWA(document.getElementById('nw-wa').value);if(wa)nw.wa=wa;S.workers.push(nw);fclear('nw-n','nw-u','nw-l','nw-wa');toast(`${n} ditambahkan ke grup ${grupNama(nw)}`);break}
+    case 'pulih-w':{const w=W(id);if(!w)return;w.hapus=false;w.aktif=true;w.hapusTgl=null;stamp('w|'+id,'Memulihkan pekerja '+w.nama);toast(`${w.nama} dipulihkan`);break}
     case 'del-w':
-      if(S.segs.some(s=>s.wid===id)||S.kasbon.some(k=>k.wid===id)||(S.alat||[]).some(a=>a.wid===id)){toast('Pekerja ini sudah punya absensi. Nonaktifkan saja supaya datanya aman.');return}
+      if(S.segs.some(s=>s.wid===id)||S.kasbon.some(k=>k.wid===id)||(S.alat||[]).some(a=>a.wid===id)){
+        // sudah punya riwayat: disembunyikan dari daftar saja, data lama (absensi, gaji, kasbon, alat) tetap utuh
+        const w=W(id);if(!w)return;w.hapus=true;w.aktif=false;w.hapusTgl=HARI_INI;stamp('w|'+id,'Menghapus pekerja '+w.nama);UI.pilih.delete(id);
+        toast(`${w.nama} dihapus dari daftar. Rekap dan absensi lamanya tetap ada.`);break}
       catat('Menghapus pekerja');S.workers=S.workers.filter(w=>w.id!==id);break;
     case 'reset':UI.reset=true;render();return;
     case 'reset-batal':UI.reset=false;render();return;
