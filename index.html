@@ -242,6 +242,9 @@ img.foto{display:block;object-fit:cover;border-radius:10px;background:var(--surf
 .seg-b.on.ok{background:var(--ok-soft);color:var(--ok)}
 .seg-b.on.putih{background:#FFFFFF;color:#111111}
 .pill.putih{background:#FFFFFF;color:#111111;border:1px solid #D7DDED}
+/* kolom nama di tabel Pekerja tetap terlihat saat tabel digeser ke samping */
+.tbl-pekerja th:first-child,.tbl-pekerja td:first-child{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:inset -1px 0 0 var(--line)}
+.tbl-pekerja thead th:first-child{z-index:3}
 #toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;z-index:20;max-width:calc(100% - 32px);text-align:center}
 @media (prefers-reduced-motion:no-preference){.blk{transition:left .2s,width .2s}}
 </style>
@@ -851,12 +854,12 @@ function vPekerja(){
     <td><input type="number" id="w${w.id}u" min="0" step="5000" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="upah" value="${w.upah}" aria-label="Upah harian"></td>
     <td class="num">${w.tipe==='event'?'<span class="muted">–</span>':`${rp(w.upah/divOf(w.tipe))}<span class="edited" style="display:block">upah harian ÷ ${divOf(w.tipe)}</span>`}</td>
     <td><input type="number" id="w${w.id}l" min="0" step="500" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="lembur" value="${w.lembur}"${w.tipe==='event'?' disabled':''} aria-label="Tarif lembur per jam"></td>
-    <td><input type="tel" id="w${w.id}wa" data-k="w" data-id="${w.id}" data-f="wa" value="${esc(tampilWA(w.wa))}" placeholder="08…" inputmode="tel" style="width:140px" aria-label="No. WA"></td>
     <td><label class="row small"><input type="checkbox" id="w${w.id}a" data-k="w" data-id="${w.id}" data-f="aktif"${w.aktif?' checked':''}> Aktif</label></td>
-    <td><button class="x" data-act="del-w" data-id="${w.id}" aria-label="Hapus pekerja">×</button></td></tr>`).join('');
+    <td><button class="x" data-act="del-w" data-id="${w.id}" aria-label="Hapus pekerja">×</button></td>
+    <td><input type="tel" id="w${w.id}wa" data-k="w" data-id="${w.id}" data-f="wa" value="${esc(tampilWA(w.wa))}" placeholder="08…" inputmode="tel" style="width:140px" aria-label="No. WA"></td></tr>`).join('');
   return `<div><div class="label">Master data</div><h2 style="font-size:24px">Pekerja</h2></div>
   <section class="panel">
-    <div class="tbl"><table><thead><tr><th>Nama</th><th>Grup</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th><th>No. WA</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="tbl"><table class="tbl-pekerja"><thead><tr><th>Nama</th><th>Grup</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th><th>Status</th><th></th><th>No. WA</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="small muted">Upah dan tarif lembur diisi manual per orang. Semua hitungan di tab lain mengikuti otomatis.</p>
   </section>
   <section class="panel kartu">
