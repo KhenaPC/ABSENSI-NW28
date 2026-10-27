@@ -564,9 +564,23 @@ function kartu(w,h){
     <div class="row"><button class="btn soft" data-act="add-seg" data-id="${w.id}">${ev?'+ Mulai argo (24 jam)':'+ Tambah blok kerja'}</button>${hadir||ev?'':`<button class="btn" data-act="normal" data-id="${w.id}">Isi hari normal</button>`}${ed('a|'+UI.tgl+'|'+w.id)}</div>
   </section>`;
 }
+// filter tim di Absensi (hanya tampilan, data tidak berubah)
+const cocokAbs=w=>!UI.fAbs||!UI.fAbs.size||UI.fAbs.has(kunciGrup(w));
+const wsHari=t=>{const sh=S.segs.filter(s=>s.tgl===t);return S.workers.filter(w=>w.aktif||sh.some(s=>s.wid===w.id))};
+const wsAbsen=()=>wsHari(UI.tgl).filter(cocokAbs);
+function chipsAbs(semua){
+  const n={};for(const w of semua){const k=kunciGrup(w);n[k]=(n[k]||0)+1}
+  const nm=k=>k.startsWith('grp:')?((GR(+k.slice(4))||{}).nama||'?'):TIPE[k];
+  const keys=Object.keys(n).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const on=UI.fAbs&&UI.fAbs.size;
+  return `<div class="chips" role="group" aria-label="Filter tim"><span class="small muted">Tim:</span>
+    <button class="chip" data-act="fabs" data-v="" aria-pressed="${!on}">Semua <span class="n">${semua.length}</span></button>
+    ${keys.map(k=>`<button class="chip" data-act="fabs" data-v="${k}" aria-pressed="${!!(on&&UI.fAbs.has(k))}">${esc(nm(k))} <span class="n">${n[k]}</span></button>`).join('')}
+  </div>`;
+}
 function vAbsensi(){
   const t=UI.tgl,sh=S.segs.filter(s=>s.tgl===t);
-  const ws=S.workers.filter(w=>w.aktif||sh.some(s=>s.wid===w.id));
+  const semuaW=wsHari(t),ws=semuaW.filter(cocokAbs);
   let hadir=0,tot=0,lem=0,cards='';
   for(const w of ws){const h=hitung(w,sh.filter(s=>s.wid===w.id));if(h.rows.some(x=>!x.err))hadir++;tot+=h.total;lem+=h.lem;cards+=kartu(w,h)}
   if(!UI.bulk.pid||!P(UI.bulk.pid))UI.bulk.pid=(S.projects.find(p=>p.aktif)||{}).id||0;
@@ -582,8 +596,9 @@ function vAbsensi(){
       ${t!==HARI_INI?'<button class="btn" data-act="hari-ini">Hari ini</button>':''}
     </div>
   </div>
+  ${semuaW.length?chipsAbs(semuaW):''}
   <div class="tiles">
-    <div class="tile t-br"><span class="label">Total upah hari ini</span><strong>${rp(tot)}</strong></div>
+    <div class="tile t-br"><span class="label">Total upah hari ini${UI.fAbs&&UI.fAbs.size?' (tim terpilih)':''}</span><strong>${rp(tot)}</strong></div>
     <div class="tile"><span class="label">Hadir</span><strong>${hadir} / ${ws.length}</strong></div>
     <div class="tile t-ot"><span class="label">Lembur</span><strong>${num(lem/60)} jam</strong></div>
   </div>
@@ -593,10 +608,10 @@ function vAbsensi(){
     <span class="small muted">Isi cepat:</span>
     <select id="bk-p" data-k="bulk" data-f="pid" aria-label="Proyek isi cepat">${opsiProyek(UI.bulk.pid)}</select>
     <span class="row"><select id="bk-a" data-k="bulk" data-f="a" aria-label="Mulai">${opsiJam(UI.bulk.a,TMAX)}</select><span class="muted">–</span><select id="bk-b" data-k="bulk" data-f="b" aria-label="Selesai">${opsiJam(UI.bulk.b,TMAX)}</select></span>
-    <button class="btn pri" data-act="bulk">Tambahkan ke ${UI.pilih.size||0} pekerja terpilih</button>
+    <button class="btn pri" data-act="bulk">Tambahkan ke ${ws.filter(w=>UI.pilih.has(w.id)).length} pekerja terpilih</button>
     <button class="btn" data-act="salin-kemarin">Salin dari hari sebelumnya</button>
   </div>
-  ${cards||'<div class="panel muted">Belum ada pekerja aktif. Tambahkan di tab Pekerja.</div>'}`;
+  ${cards||(semuaW.length?'<div class="panel muted">Tidak ada pekerja di tim yang dipilih.</div>':'<div class="panel muted">Belum ada pekerja aktif. Tambahkan di tab Pekerja.</div>')}`;
 }
 
 /* ---------- PERIODE ---------- */
@@ -1164,6 +1179,7 @@ document.addEventListener('click',e=>{
   switch(act){
     case 'pdf':unduhPDF([id]);return;
     case 'pdf-pilih':{const vis=new Set(gajiTampil().map(o=>o.w.id));unduhPDF([...UI.slip].filter(i=>vis.has(i)));return}return;
+    case 'fabs':{const v=t.dataset.v;UI.fAbs=UI.fAbs||new Set();if(!v)UI.fAbs.clear();else UI.fAbs.has(v)?UI.fAbs.delete(v):UI.fAbs.add(v);render();return}
     case 'fgaji':{const v=t.dataset.v;UI.fGaji=UI.fGaji||new Set();if(!v)UI.fGaji.clear();else UI.fGaji.has(v)?UI.fGaji.delete(v):UI.fGaji.add(v);render();return}
     case 'pdf-p':unduhProyek([id]);return;
     case 'pdf-p-pilih':unduhProyek([...UI.prj]);return;
@@ -1178,10 +1194,11 @@ document.addEventListener('click',e=>{
       for(const [a,b] of sesi(S.rules[w.tipe]))S.segs.push({id:nid(),tgl:UI.tgl,wid:id,pid,a,b,tarif:null});abs(id,UI.tgl);break}
     case 'del-seg':{const s=S.segs.find(s=>s.id===id);if(s)abs(s.wid,s.tgl);S.segs=S.segs.filter(s=>s.id!==id);break}
     case 'bulk':{
-      if(!UI.pilih.size){toast('Centang dulu pekerja yang mau diisi');return}
+      const tampil=new Set(wsAbsen().map(w=>w.id)),target=[...UI.pilih].filter(id=>tampil.has(id));
+      if(!target.length){toast('Centang dulu pekerja yang mau diisi');return}
       if(UI.bulk.b<=UI.bulk.a){toast('Jam selesai harus setelah jam mulai');return}
       let ok=0,skip=0;
-      for(const wid of UI.pilih){
+      for(const wid of target){
         if(S.rules[W(wid).tipe].mode==='argo'){
           if(S.segs.some(s=>s.tgl===UI.tgl&&s.wid===wid)){skip++;continue}
           S.segs.push({id:nid(),tgl:UI.tgl,wid,pid:UI.bulk.pid,a:UI.bulk.a,b:1440,hari:1,tarif:null});abs(wid,UI.tgl);ok++;continue}
@@ -1192,7 +1209,7 @@ document.addEventListener('click',e=>{
       const prev=S.segs.filter(s=>s.tgl<UI.tgl).reduce((m,s)=>s.tgl>m?s.tgl:m,'');
       if(!prev){toast('Belum ada absensi di hari sebelumnya');return}
       const sudah=new Set(S.segs.filter(s=>s.tgl===UI.tgl).map(s=>s.wid));let n=0;
-      for(const s of S.segs.filter(s=>s.tgl===prev)){const w=W(s.wid);if(!w||!w.aktif||sudah.has(s.wid))continue;S.segs.push({...s,id:nid(),tgl:UI.tgl});abs(s.wid,UI.tgl);n++}
+      for(const s of S.segs.filter(s=>s.tgl===prev)){const w=W(s.wid);if(!w||!w.aktif||sudah.has(s.wid)||!cocokAbs(w))continue;S.segs.push({...s,id:nid(),tgl:UI.tgl});abs(s.wid,UI.tgl);n++}
       toast(n?`${n} blok disalin dari ${tglPendek(prev)}`:'Semua pekerja sudah terisi, tidak ada yang disalin');break}
     case 'kosongkan':S.segs=[];S.kasbon=[];S.contoh=false;catat('Menghapus absensi contoh');toast('Absensi contoh dihapus. Pekerja dan proyek masih ada, silakan diedit.');break;
     case 'add-kas':{
@@ -1308,7 +1325,7 @@ document.addEventListener('change',e=>{
   else if(k==='slip'){v?UI.slip.add(id):UI.slip.delete(id);render();return}
   else if(k==='slip-semua'){UI.slip.clear();if(v)for(const o of gajiTampil())UI.slip.add(o.w.id);render();return}
   else if(k==='pilih'){v?UI.pilih.add(id):UI.pilih.delete(id);render();return}
-  else if(k==='semua'){UI.pilih.clear();if(v){const sh=S.segs.filter(s=>s.tgl===UI.tgl);for(const w of S.workers)if(w.aktif||sh.some(s=>s.wid===w.id))UI.pilih.add(w.id)}render();return}
+  else if(k==='semua'){UI.pilih.clear();if(v)for(const w of wsAbsen())UI.pilih.add(w.id);render();return}
   else if(k==='bulk'){UI.bulk[f]=+v;render();return}
   ubah();
 });
