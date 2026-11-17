@@ -814,6 +814,31 @@ function vProyek(){
   const mx=Math.max(1,...list.map(o=>o.bN+o.bL)),tot=list.reduce((t,o)=>t+o.bN+o.bL,0),totK=list.reduce((t,o)=>t+o.kas,0);
   const detail=(o,pdf)=>{
     const k=kum[o.p.id]||{tot:0,awal:UI.dari},per={};
+    // filter grup per proyek (hanya tampilan; PDF tetap berisi semua pekerja)
+    const nmG=g=>g.startsWith('grp:')?((GR(+g.slice(4))||{}).nama||'?'):TIPE[g];
+    const gN={};for(const d of o.det){const g=kunciGrup(d.w);(gN[g]=gN[g]||new Set()).add(d.w.id)}
+    const fs=pdf?null:(UI.fPrj||{})[o.p.id],fOn=!!(fs&&fs.size);
+    const cocok=w=>!fOn||fs.has(kunciGrup(w));
+    const dAll=o.det,O0=o;o={...o,det:o.det.filter(d=>cocok(d.w))};
+    let ring='';
+    if(!pdf&&Object.keys(gN).length){
+      const keys=Object.keys(gN).sort((a,b)=>nmG(a).localeCompare(nmG(b)));
+      const chips=`<div class="chips" role="group" aria-label="Filter grup pekerja"><span class="small muted">Grup:</span>
+        <button class="chip" data-act="fprj" data-id="${o.p.id}" data-v="" aria-pressed="${!fOn}">Semua <span class="n">${new Set(dAll.map(d=>d.w.id)).size}</span></button>
+        ${keys.map(g=>`<button class="chip" data-act="fprj" data-id="${o.p.id}" data-v="${g}" aria-pressed="${!!(fOn&&fs.has(g))}">${esc(nmG(g))} <span class="n">${gN[g].size}</span></button>`).join('')}</div>`;
+      if(fOn){
+        const T={hari:0,lem:0,bN:0,bL:0};for(const d of o.det){T.hari+=d.x.bobot;T.lem+=d.x.lem;T.bN+=d.x.bN;T.bL+=d.x.bL}
+        const kf=o.kl.filter(x=>{const w=W(x.wid);return w&&cocok(w)}),kas=kf.reduce((t,x)=>t+x.jumlah,0);
+        const nama=keys.filter(g=>fs.has(g)).map(nmG).join(', ');
+        ring=`${chips}<div class="tiles in">
+          <div class="tile"><span class="label">Upah normal grup</span><strong>${rp(T.bN)}</strong><span class="small muted num">${num(T.hari)} hari-orang</span></div>
+          <div class="tile t-ot"><span class="label">Upah lembur grup</span><strong>${rp(T.bL)}</strong><span class="small muted num">${num(T.lem/60)} jam lembur</span></div>
+          <div class="tile"><span class="label">Kasbon grup</span><strong>${kas?'−'+rp(kas):'–'}</strong><span class="small muted num">${kf.length} kasbon di periode ini</span></div>
+          <div class="tile t-br"><span class="label">Total upah ${esc(nama)}</span><strong>${rp(T.bN+T.bL-kas)}</strong><span class="small muted">${tglPendek(UI.dari)} – ${tglPendek(UI.sampai)}${kas?`. Upah ${rp(T.bN+T.bL)} dikurangi kasbon ${rp(kas)}`:''}</span></div>
+        </div>`;
+        o={...o,hari:T.hari,lem:T.lem,bN:T.bN,bL:T.bL,kas,kl:kf};
+      }else ring=chips;
+    }
     for(const d of o.det){const a=per[d.w.id]=per[d.w.id]||{w:d.w,hari:0,lem:0,b:0};a.hari+=d.x.bobot;a.lem+=d.x.lem;a.b+=d.x.bN+d.x.bL}
     const det=[...o.det].sort((a,b)=>a.tgl<b.tgl?-1:a.tgl>b.tgl?1:a.w.nama.localeCompare(b.w.nama)||a.x.s.a-b.x.s.a);
     let last='';
@@ -827,16 +852,17 @@ function vProyek(){
     return `<div class="pdetail">
       ${pdf?'':`<div class="row"><span class="grow small muted">PDF mengikuti periode yang sedang dipilih.</span><button class="btn pri" data-act="pdf-p" data-id="${o.p.id}">Unduh PDF proyek</button></div>`}
       <div class="tiles in">
-        <div class="tile"><span class="label">Bobot upah normal</span><strong>${rp(o.bN)}</strong><span class="small muted num">${num(o.hari)} hari-orang</span></div>
-        <div class="tile t-ot"><span class="label">Bobot lembur</span><strong>${rp(o.bL)}</strong><span class="small muted num">${num(o.lem/60)} jam lembur</span></div>
-        <div class="tile"><span class="label">Kasbon proyek ini</span><strong>${o.kas?'−'+rp(o.kas):'–'}</strong><span class="small muted num">${o.kl.length} kasbon di periode ini</span></div>
+        <div class="tile"><span class="label">Bobot upah normal</span><strong>${rp(O0.bN)}</strong><span class="small muted num">${num(O0.hari)} hari-orang</span></div>
+        <div class="tile t-ot"><span class="label">Bobot lembur</span><strong>${rp(O0.bL)}</strong><span class="small muted num">${num(O0.lem/60)} jam lembur</span></div>
+        <div class="tile"><span class="label">Kasbon proyek ini</span><strong>${O0.kas?'−'+rp(O0.kas):'–'}</strong><span class="small muted num">${O0.kl.length} kasbon di periode ini</span></div>
         <div class="tile t-br"><span class="label">Nilai proyek s.d. ${tglPendek(UI.sampai)}</span><strong>${rp(k.tot-(kbK[o.p.id]||0))}</strong><span class="small muted">sejak absensi pertama proyek ini, ${tglPendek(k.awal)}${kbK[o.p.id]?`. Upah ${rp(k.tot)} dikurangi kasbon ${rp(kbK[o.p.id])}`:''}</span></div>
       </div>
+      ${ring}
       <div><div class="label" style="margin-bottom:6px">Pekerja di proyek ini (${tglPendek(UI.dari)} – ${tglPendek(UI.sampai)})</div><div class="row">${orang}</div></div>
       <div class="tbl"><table>
         <thead><tr><th>Tanggal</th><th>Pekerja</th><th>Jam kerja</th><th class="r">Bobot hari</th><th class="r">Upah normal</th><th class="r">Jam lembur</th><th class="r">Upah lembur</th><th class="r">Jumlah</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="3">Total periode ini</td><td class="r">${num(o.hari)}</td><td class="r">${rp(o.bN)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bL)}</td><td class="r">${rp(o.bN+o.bL)}</td></tr>${o.kas?`<tr><td colspan="7">Kasbon proyek ini</td><td class="r">−${rp(o.kas)}</td></tr><tr><td colspan="7">Nilai proyek periode ini</td><td class="r">${rp(o.bN+o.bL-o.kas)}</td></tr>`:''}</tfoot>
+        <tfoot><tr><td colspan="3">Total periode ini${fOn?' (grup terpilih)':''}</td><td class="r">${num(o.hari)}</td><td class="r">${rp(o.bN)}</td><td class="r">${num(o.lem/60)}</td><td class="r">${rp(o.bL)}</td><td class="r">${rp(o.bN+o.bL)}</td></tr>${o.kas?`<tr><td colspan="7">Kasbon ${fOn?'grup terpilih':'proyek ini'}</td><td class="r">−${rp(o.kas)}</td></tr><tr><td colspan="7">${fOn?'Total upah grup terpilih':'Nilai proyek periode ini'}</td><td class="r">${rp(o.bN+o.bL-o.kas)}</td></tr>`:''}</tfoot>
       </table></div>
       ${o.kl.length?`<div><div class="label" style="margin-bottom:6px">Kasbon yang dibebankan ke proyek ini</div><div class="detail-list small">${o.kl.map(k=>`<div><b>${tglPendek(k.tgl)}</b><span>${esc((W(k.wid)||{}).nama||'?')}</span><span class="muted">${esc(k.ket||'')}</span><span class="num">−${rp(k.jumlah)}</span></div>`).join('')}</div></div>`:''}
     </div>`};
@@ -1179,6 +1205,7 @@ document.addEventListener('click',e=>{
   switch(act){
     case 'pdf':unduhPDF([id]);return;
     case 'pdf-pilih':{const vis=new Set(gajiTampil().map(o=>o.w.id));unduhPDF([...UI.slip].filter(i=>vis.has(i)));return}return;
+    case 'fprj':{const v=t.dataset.v;UI.fPrj=UI.fPrj||{};const s=UI.fPrj[id]=UI.fPrj[id]||new Set();if(!v)s.clear();else s.has(v)?s.delete(v):s.add(v);render();return}
     case 'fabs':{const v=t.dataset.v;UI.fAbs=UI.fAbs||new Set();if(!v)UI.fAbs.clear();else UI.fAbs.has(v)?UI.fAbs.delete(v):UI.fAbs.add(v);render();return}
     case 'fgaji':{const v=t.dataset.v;UI.fGaji=UI.fGaji||new Set();if(!v)UI.fGaji.clear();else UI.fGaji.has(v)?UI.fGaji.delete(v):UI.fGaji.add(v);render();return}
     case 'pdf-p':unduhProyek([id]);return;
