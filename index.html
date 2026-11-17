@@ -567,7 +567,21 @@ function kartu(w,h){
 // filter tim di Absensi (hanya tampilan, data tidak berubah)
 const cocokAbs=w=>!UI.fAbs||!UI.fAbs.size||UI.fAbs.has(kunciGrup(w));
 const wsHari=t=>{const sh=S.segs.filter(s=>s.tgl===t);return S.workers.filter(w=>w.aktif||sh.some(s=>s.wid===w.id))};
-const wsAbsen=()=>wsHari(UI.tgl).filter(cocokAbs);
+// filter proyek di Absensi: hanya pekerja yang punya blok di proyek terpilih pada tanggal itu
+const fpOn=()=>!!(UI.fpAbs&&UI.fpAbs.size);
+const cocokPA=(w,t)=>!fpOn()||S.segs.some(s=>s.tgl===t&&s.wid===w.id&&UI.fpAbs.has(s.pid));
+const wsAbsen=()=>wsHari(UI.tgl).filter(w=>cocokAbs(w)&&cocokPA(w,UI.tgl));
+function chipsPA(wsTim,sh){
+  const n={};for(const s of sh){if(!wsTim.some(w=>w.id===s.wid))continue;(n[s.pid]=n[s.pid]||new Set()).add(s.wid)}
+  if(fpOn())for(const pid of UI.fpAbs)n[pid]=n[pid]||new Set();
+  const ids=Object.keys(n).map(Number).filter(pid=>P(pid)).sort((a,b)=>P(a).nama.localeCompare(P(b).nama));
+  if(!ids.length)return '';
+  const on=fpOn();
+  return `<div class="chips" role="group" aria-label="Filter proyek"><span class="small muted">Proyek:</span>
+    <button class="chip" data-act="fpabs" data-v="" aria-pressed="${!on}">Semua</button>
+    ${ids.map(pid=>`<button class="chip" data-act="fpabs" data-v="${pid}" aria-pressed="${!!(on&&UI.fpAbs.has(pid))}"><i class="dot" style="background:${P(pid).warna}"></i>${esc(P(pid).nama)} <span class="n">${n[pid].size}</span></button>`).join('')}
+  </div>`;
+}
 function chipsAbs(semua){
   const n={};for(const w of semua){const k=kunciGrup(w);n[k]=(n[k]||0)+1}
   const nm=k=>k.startsWith('grp:')?((GR(+k.slice(4))||{}).nama||'?'):TIPE[k];
@@ -580,9 +594,12 @@ function chipsAbs(semua){
 }
 function vAbsensi(){
   const t=UI.tgl,sh=S.segs.filter(s=>s.tgl===t);
-  const semuaW=wsHari(t),ws=semuaW.filter(cocokAbs);
+  const semuaW=wsHari(t),wsTim=semuaW.filter(cocokAbs),ws=wsTim.filter(w=>cocokPA(w,t)),fp=fpOn();
   let hadir=0,tot=0,lem=0,cards='';
-  for(const w of ws){const h=hitung(w,sh.filter(s=>s.wid===w.id));if(h.rows.some(x=>!x.err))hadir++;tot+=h.total;lem+=h.lem;cards+=kartu(w,h)}
+  for(const w of ws){const h=hitung(w,sh.filter(s=>s.wid===w.id));
+    if(fp){const r=h.rows.filter(x=>!x.err&&UI.fpAbs.has(x.s.pid));if(r.length)hadir++;for(const x of r){tot+=x.bN+x.bL;lem+=x.lem}}
+    else{if(h.rows.some(x=>!x.err))hadir++;tot+=h.total;lem+=h.lem}
+    cards+=kartu(w,h)}
   if(!UI.bulk.pid||!P(UI.bulk.pid))UI.bulk.pid=(S.projects.find(p=>p.aktif)||{}).id||0;
   const leg=S.projects.filter(p=>p.aktif).map(p=>`<span><i class="dot" style="background:${p.warna}"></i>${esc(p.nama)}</span>`).join('');
   return `
@@ -597,10 +614,11 @@ function vAbsensi(){
     </div>
   </div>
   ${semuaW.length?chipsAbs(semuaW):''}
+  ${chipsPA(wsTim,sh)}
   <div class="tiles">
-    <div class="tile t-br"><span class="label">Total upah hari ini${UI.fAbs&&UI.fAbs.size?' (tim terpilih)':''}</span><strong>${rp(tot)}</strong></div>
+    <div class="tile t-br"><span class="label">Total upah hari ini${fp?' (proyek terpilih)':UI.fAbs&&UI.fAbs.size?' (tim terpilih)':''}</span><strong>${rp(tot)}</strong></div>
     <div class="tile"><span class="label">Hadir</span><strong>${hadir} / ${ws.length}</strong></div>
-    <div class="tile t-ot"><span class="label">Lembur</span><strong>${num(lem/60)} jam</strong></div>
+    <div class="tile t-ot"><span class="label">Lembur${fp?' (proyek terpilih)':''}</span><strong>${num(lem/60)} jam</strong></div>
   </div>
   <div class="legend">${leg}<span><i class="sw-ist"></i>istirahat (tidak dibayar)</span><span><i class="sw-ot"></i>zona lembur</span></div>
   <div class="bulk row">
@@ -611,7 +629,7 @@ function vAbsensi(){
     <button class="btn pri" data-act="bulk">Tambahkan ke ${ws.filter(w=>UI.pilih.has(w.id)).length} pekerja terpilih</button>
     <button class="btn" data-act="salin-kemarin">Salin dari hari sebelumnya</button>
   </div>
-  ${cards||(semuaW.length?'<div class="panel muted">Tidak ada pekerja di tim yang dipilih.</div>':'<div class="panel muted">Belum ada pekerja aktif. Tambahkan di tab Pekerja.</div>')}`;
+  ${cards||(semuaW.length?'<div class="panel muted">Tidak ada pekerja yang cocok dengan filter tim/proyek yang dipilih.</div>':'<div class="panel muted">Belum ada pekerja aktif. Tambahkan di tab Pekerja.</div>')}`;
 }
 
 /* ---------- PERIODE ---------- */
@@ -1206,6 +1224,7 @@ document.addEventListener('click',e=>{
     case 'pdf':unduhPDF([id]);return;
     case 'pdf-pilih':{const vis=new Set(gajiTampil().map(o=>o.w.id));unduhPDF([...UI.slip].filter(i=>vis.has(i)));return}return;
     case 'fprj':{const v=t.dataset.v;UI.fPrj=UI.fPrj||{};const s=UI.fPrj[id]=UI.fPrj[id]||new Set();if(!v)s.clear();else s.has(v)?s.delete(v):s.add(v);render();return}
+    case 'fpabs':{const v=t.dataset.v;UI.fpAbs=UI.fpAbs||new Set();if(!v)UI.fpAbs.clear();else{const n=+v;UI.fpAbs.has(n)?UI.fpAbs.delete(n):UI.fpAbs.add(n)}render();return}
     case 'fabs':{const v=t.dataset.v;UI.fAbs=UI.fAbs||new Set();if(!v)UI.fAbs.clear();else UI.fAbs.has(v)?UI.fAbs.delete(v):UI.fAbs.add(v);render();return}
     case 'fgaji':{const v=t.dataset.v;UI.fGaji=UI.fGaji||new Set();if(!v)UI.fGaji.clear();else UI.fGaji.has(v)?UI.fGaji.delete(v):UI.fGaji.add(v);render();return}
     case 'pdf-p':unduhProyek([id]);return;
@@ -1236,7 +1255,7 @@ document.addEventListener('click',e=>{
       const prev=S.segs.filter(s=>s.tgl<UI.tgl).reduce((m,s)=>s.tgl>m?s.tgl:m,'');
       if(!prev){toast('Belum ada absensi di hari sebelumnya');return}
       const sudah=new Set(S.segs.filter(s=>s.tgl===UI.tgl).map(s=>s.wid));let n=0;
-      for(const s of S.segs.filter(s=>s.tgl===prev)){const w=W(s.wid);if(!w||!w.aktif||sudah.has(s.wid)||!cocokAbs(w))continue;S.segs.push({...s,id:nid(),tgl:UI.tgl});abs(s.wid,UI.tgl);n++}
+      for(const s of S.segs.filter(s=>s.tgl===prev)){const w=W(s.wid);if(!w||!w.aktif||sudah.has(s.wid)||!cocokAbs(w)||(fpOn()&&!UI.fpAbs.has(s.pid)))continue;S.segs.push({...s,id:nid(),tgl:UI.tgl});abs(s.wid,UI.tgl);n++}
       toast(n?`${n} blok disalin dari ${tglPendek(prev)}`:'Semua pekerja sudah terisi, tidak ada yang disalin');break}
     case 'kosongkan':S.segs=[];S.kasbon=[];S.contoh=false;catat('Menghapus absensi contoh');toast('Absensi contoh dihapus. Pekerja dan proyek masih ada, silakan diedit.');break;
     case 'add-kas':{
