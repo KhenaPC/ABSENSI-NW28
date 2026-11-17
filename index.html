@@ -121,7 +121,8 @@ input[type=checkbox]{width:18px;height:18px;accent-color:var(--brand)}
 .tl i{position:absolute;top:0;bottom:0;display:block}
 .tl .z-ot{background:var(--ot-soft)}
 .tl .blk{top:4px;bottom:4px;border-radius:5px}
-.tl .blk.err{background:transparent!important;border:2px dashed var(--bad)}
+.tl .blk.cst{outline:2px dashed var(--ink);outline-offset:-2px}
+.blk.err{background:transparent!important;border:2px dashed var(--bad)}
 .tl .ist{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 6px),var(--surface-2);z-index:2}
 .tl .mark{width:0;border-left:2px dashed var(--ot);z-index:3}
 .ticks{position:relative;height:16px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -164,6 +165,8 @@ tr.detail td{background:var(--surface-2);font-size:13px}
 .tiles.in .tile strong{font-size:20px}
 .pbar .bar i.l{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 4px,transparent 4px 8px)}
 
+.ua{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.atr-sel{max-width:200px}
 .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
 .field{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
 .field:last-child{border-bottom:0}
@@ -281,16 +284,45 @@ function sesi(r){
   }
   return out;
 }
+// grup & aturan pekerja pada tanggal tertentu (riwayat grup: pindah grup tidak mengubah hitungan tanggal lama)
+const grupPada=(w,tgl)=>{const R=w.riwayat;if(!R||!R.length)return {grup:w.grup||null,tipe:w.tipe};let o=R[0];for(const e of R)if(e.dari<=tgl)o=e;return o};
+const kunciPada=(w,tgl)=>{const g=grupPada(w,tgl);return g.grup&&GR(g.grup)?'grp:'+g.grup:g.tipe};
+const ATR=id=>(S.atr||[]).find(a=>a.id===id);
+function ctxDasar(w,tgl){const t=grupPada(w,tgl).tipe;return {at:0,tipe:t,r:S.rules[t],upah:w.upah,lembur:w.lembur,div:divOf(t)}}
+function ctxBlok(w,s){
+  if(!s.at)return ctxDasar(w,s.tgl);
+  const a=ATR(s.at);if(!a)return {err:'Aturan khusus blok ini sudah dihapus, belum dihitung'};
+  const u=(w.upahA||{})[s.at];if(!u||!(+u.upah>0))return {err:`Upah aturan "${a.nama}" untuk ${w.nama} belum diisi di tab Pekerja`};
+  return {at:a.id,nama:a.nama,tipe:grupPada(w,s.tgl).tipe,r:a,upah:+u.upah,lembur:+u.lembur||0,div:Math.max(1,+a.div||8)};
+}
+// blok tanpa aturan khusus dihitung persis seperti sebelumnya; blok dengan aturan khusus dihitung per aturan lalu dijumlah
 function hitung(w,list){
-  const r=S.rules[w.tipe],ss=sesi(r),sw=ss.length?1/ss.length:0;
-  const rows=[...list].sort((p,q)=>p.a-q.a||p.id-q.id).map(s=>({s,err:'',bobot:0,lem:0,eff:0,bN:0,bL:0}));
+  if(!list.some(s=>s.at))return inti(ctxDasar(w,list.length?list[0].tgl:UI.tgl),list);
+  const base=ctxDasar(w,list[0].tgl),grp=new Map(),bad=[],ok=[];
+  for(const s of [...list].sort((p,q)=>p.a-q.a||p.id-q.id)){
+    const c=ctxBlok(w,s);
+    if(c.err){bad.push({s,err:c.err,ctx:base});continue}
+    if(s.b>s.a&&ok.some(o=>ov(o.a,o.b,s.a,s.b)>0)){bad.push({s,err:'Bentrok dengan blok lain, belum dihitung',ctx:c});continue}
+    if(s.b>s.a)ok.push(s);
+    const k=c.at||0;if(!grp.has(k))grp.set(k,{c,l:[]});grp.get(k).l.push(s);
+  }
+  const rows=[];let dobel=false,syarat=null;
+  for(const [k,{c,l}] of grp){const h=inti(c,l);for(const x of h.rows)x.dobelG=h.dobel;rows.push(...h.rows);if(h.dobel)dobel=true;if(k===0||syarat==null)syarat=h.syarat}
+  for(const b of bad)rows.push({s:b.s,err:b.err,bobot:0,lem:0,eff:0,bN:0,bL:0,ctx:b.ctx});
+  rows.sort((p,q)=>p.s.a-q.s.a||p.s.id-q.s.id);
+  const sum=f=>rows.reduce((t,x)=>t+(x.err?0:x[f]),0),bN=sum('bN'),bL=sum('bL');
+  return {rows,dobel,syarat,hari:sum('bobot'),lem:sum('lem'),bN,bL,total:bN+bL,multi:true};
+}
+function inti(ctx,list){
+  const r=ctx.r,ss=sesi(r),sw=ss.length?1/ss.length:0;
+  const rows=[...list].sort((p,q)=>p.a-q.a||p.id-q.id).map(s=>({s,err:'',bobot:0,lem:0,eff:0,bN:0,bL:0,ctx}));
   const okd=[];
   if(r.mode==='argo'){
     let n=0;
     for(const x of rows){
       if(n++){x.err='Sudah ada argo lain di hari ini, belum dihitung';continue}
       x.argo=Math.max(1,x.s.hari||1);x.bobot=x.argo;x.eff=x.argo*1440;
-      x.tarif=x.s.tarif!=null?x.s.tarif:w.upah;x.bN=x.argo*x.tarif;
+      x.tarif=x.s.tarif!=null?x.s.tarif:ctx.upah;x.bN=x.argo*x.tarif;
     }
   }else for(const x of rows){
     const s=x.s;
@@ -303,17 +335,17 @@ function hitung(w,list){
     let nm=0;
     for(const [p,q] of ss)nm+=ov(s.a,s.b,p,q);
     x.lem=Math.max(0,x.eff-nm);
-    x.tarif=s.tarif!=null?s.tarif:w.lembur;
+    x.tarif=s.tarif!=null?s.tarif:ctx.lembur;
     x.bL=x.lem/60*x.tarif;
   }
   if(r.mode!=='argo'){
     // sesi normal yang terisi penuh = 0,5 hari; jam normal di sesi yang tidak penuh dibayar per jam (upah harian / pembagi)
-    const div=divOf(w.tipe),cover=ss.map(([p,q])=>okd.reduce((t,s)=>t+ov(s.a,s.b,p,q),0));
+    const div=ctx.div,cover=ss.map(([p,q])=>okd.reduce((t,s)=>t+ov(s.a,s.b,p,q),0));
     for(const x of rows){
       if(x.err)continue;
       x.bobotS=0;x.jn=0;
       ss.forEach(([p,q],i)=>{const o=ov(x.s.a,x.s.b,p,q);if(!o)return;if(cover[i]>=q-p)x.bobotS+=o/(q-p)*sw;else x.jn+=o});
-      x.bobot=x.bobotS+x.jn/60/div;x.bN=x.bobot*w.upah;
+      x.bobot=x.bobotS+x.jn/60/div;x.bN=x.bobot*ctx.upah;
     }
   }
   const lem=rows.reduce((t,x)=>t+x.lem,0);
@@ -323,7 +355,7 @@ function hitung(w,list){
   const syarat=r.dobel&&okd.length?masuk+(r.dobelJam-r.mulai):null;
   const dobel=syarat!=null&&lem>0&&keluar>=syarat;
   if(dobel){
-    const pool=r.ganti?Math.max(0,2-hari)*w.upah:w.upah;
+    const pool=r.ganti?Math.max(0,2-hari)*ctx.upah:ctx.upah;
     // jam kerja setelah syarat 2x terpenuhi tetap dibayar lembur per jam, di atas 2x upah
     for(const x of rows){
       x.lemA=0;if(x.err||!r.ganti)continue;
@@ -346,7 +378,7 @@ function hitung(w,list){
 const KEY='nw28-absensi-v1', T0=360, T1=1440, TMAX=1920; // blok kerja boleh sampai 08:00 hari berikutnya
 const TIPE={workshop:'Workshop NW28',garut:'Tim Garut',event:'Event'}, PC={workshop:'ws',garut:'gr',event:'ev'};
 const ARGO=()=>({mode:'argo',mulai:0,selesai:1440,ist:[]});
-const FORM=['am-n','am-o','am-c','am-k','al-m','al-kp','al-kc','bk-k','bk-c','nw-wa','al-t','al-n','al-j','al-p','al-w','al-g','al-k','nw-n','nw-t','nw-u','nw-l','ng-n','ng-a','np-n','kb-w','kb-p','kb-t','kb-j','kb-k'];
+const FORM=['atr-n','atr-m','am-n','am-o','am-c','am-k','al-m','al-kp','al-kc','bk-k','bk-c','nw-wa','al-t','al-n','al-j','al-p','al-w','al-g','al-k','nw-n','nw-t','nw-u','nw-l','ng-n','ng-a','np-n','kb-w','kb-p','kb-t','kb-j','kb-k'];
 const fv=(id,def='')=>UI.form&&UI.form[id]!=null?UI.form[id]:def;
 const fclear=(...ids)=>{if(UI.form)for(const i of ids)delete UI.form[i]};
 for(const ev of ['input','change'])document.addEventListener(ev,e=>{const t=e.target;if(t&&FORM.includes(t.id)){UI.form=UI.form||{};UI.form[t.id]=t.value}},true);
@@ -355,7 +387,7 @@ const grupNama=w=>{const g=w.grup&&GR(w.grup);return g?g.nama:TIPE[w.tipe]};
 const setGrup=(w,v)=>{if(v.startsWith('grp:')){const g=GR(+v.slice(4));if(g){w.grup=g.id;w.tipe=g.aturan}}else{w.grup=null;w.tipe=v}};
 const opsiGrup=(v,pendek)=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('')+(S.grup||[]).map(g=>`<option value="grp:${g.id}"${'grp:'+g.id===v?' selected':''}>${esc(g.nama)}${pendek?'':` (aturan ${TIPE[g.aturan]})`}</option>`).join('');
 const opsiTipe=v=>Object.keys(TIPE).map(k=>`<option value="${k}"${k===v?' selected':''}>${TIPE[k]}</option>`).join('');
-const jamTxt=x=>x.argo?`${hm(x.s.a)} + ${x.argo}×24 jam`:`${hm(x.s.a)}–${hm(x.s.b)}`;
+const jamTxt=x=>(x.argo?`${hm(x.s.a)} + ${x.argo}×24 jam`:`${hm(x.s.a)}–${hm(x.s.b)}`)+(x.ctx&&x.ctx.at?` · ${esc(x.ctx.nama)}`:'');
 const WARNA=['#2F6BFF','#12A594','#E0338B','#E5A800','#8B5CF6','#FF7A1A','#3FAE3A','#E5484D','#00B8D9','#8D5524','#9BCF2E','#1E3A8A','#C026D3','#6B7280','#065F46','#F472B6','#7F1D1D','#60A5FA','#4D7C0F','#FDBA74'];
 // warna proyek harus unik: proyek yang warnanya sama/terlalu mirip dengan proyek sebelumnya diberi warna lain
 const rgbOf=c=>{const m=/^#?([0-9a-f]{6})$/i.exec(String(c||''));if(!m)return null;const n=parseInt(m[1],16);return [n>>16&255,n>>8&255,n&255]};
@@ -428,7 +460,7 @@ async function rpc(fn,body){
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];S.alatMaster=S.alatMaster||[];if(!S.rules.event)S.rules.event=ARGO();if(rapikanWarna()&&UI.role!=='gudang')setTimeout(()=>{if(CRED)simpan()},0)}
+function pakai(d){S=(d&&d.workers)?d:kosong();S.edit=S.edit||{};S.log=S.log||[];S.kasbon=S.kasbon||[];S.grup=S.grup||[];S.alat=S.alat||[];S.alatMaster=S.alatMaster||[];S.atr=S.atr||[];if(!S.rules.event)S.rules.event=ARGO();if(rapikanWarna()&&UI.role!=='gudang')setTimeout(()=>{if(CRED)simpan()},0)}
 function setSync(t){UI.sync=t;const e=document.getElementById('sync');if(e)e.textContent=t}
 async function masuk(u,p){
   const r=await rpc('nw28_load',{p_user:u,p_pass:p,p_have:null});
@@ -516,8 +548,10 @@ function hasilBlok(x,dobel){
 }
 
 /* ---------- ABSENSI ---------- */
+const milikNama=k=>k.startsWith('grp:')?((GR(+k.slice(4))||{}).nama||'?'):TIPE[k];
+const atrUntuk=(w,tgl,cur)=>(S.atr||[]).filter(a=>(a.milik===kunciPada(w,tgl)&&a.berlaku<=tgl)||a.id===cur);
 function kartu(w,h){
-  const r=S.rules[w.tipe];
+  const r=ctxDasar(w,UI.tgl).r;
   const ev=r.mode==='argo';
   const t1=h.rows.some(x=>x.s.b>T1||x.s.a>T1)?TMAX:T1,px=m=>Math.max(0,Math.min(100,(m-T0)/(t1-T0)*100));
   let tl=ev?'':`<i class="z-ot" style="left:${px(r.selesai)}%;right:0"></i>`,bawa='';
@@ -528,7 +562,7 @@ function kartu(w,h){
     tl+=`<i class="blk" style="left:0;width:${px(end===UI.tgl?s.a:1440)}%;background:${c};opacity:.45"></i>`;
     bawa+=`<div class="blok"><span class="dot" style="background:${c}"></span><span class="grow small">Argo ${esc(p?p.nama:'')} dari ${tglPendek(s.tgl)} ${hm(s.a)} masih berjalan sampai ${tglPendek(end)} ${hm(s.a)}. Sudah dihitung di tanggal berangkat.</span></div>`;
   }
-  for(const x of h.rows){const p=P(x.s.pid);tl+=`<i class="blk${x.err?' err':''}" style="left:${px(x.s.a)}%;width:${Math.max(0,px(ev?1440:x.s.b)-px(x.s.a))}%;background:${p?p.warna:'var(--muted)'}" title="${esc(p?p.nama:'')} ${hm(x.s.a)}–${hm(x.s.b)}"></i>`}
+  for(const x of h.rows){const p=P(x.s.pid),cs=x.s.at&&ATR(x.s.at);tl+=`<i class="blk${x.err?' err':''}${cs?' cst':''}" style="left:${px(x.s.a)}%;width:${Math.max(0,px(ev?1440:x.s.b)-px(x.s.a))}%;background:${p?p.warna:'var(--muted)'}" title="${esc(p?p.nama:'')} ${hm(x.s.a)}–${hm(x.s.b)}${cs?' · '+esc(cs.nama):''}"></i>`}
   for(const [a,b] of r.ist)tl+=`<i class="ist" style="left:${px(a)}%;width:${px(b)-px(a)}%"></i>`;
   if(!ev)tl+=`<i class="mark" style="left:${px(r.selesai)}%"></i>`;
   let ticks='';for(let m=T0;m<=t1;m+=120)ticks+=`<span class="${m===T0?'first':m===t1?'last':''}" style="left:${px(m)}%">${String(m>1440?m/60-24:m/60).padStart(2,'0')}${m>1440?'⁺':''}</span>`;
@@ -546,8 +580,9 @@ function kartu(w,h){
       <span class="dot" style="background:${p?p.warna:'var(--muted)'}"></span>
       <select class="proj" id="s${s.id}p" data-k="seg" data-id="${s.id}" data-f="pid" aria-label="Proyek">${opsiProyek(s.pid)}</select>
       <span class="jam"><select id="s${s.id}a" data-k="seg" data-id="${s.id}" data-f="a" aria-label="Jam mulai">${opsiJam(s.a,TMAX)}</select><span class="muted">–</span><select id="s${s.id}b" data-k="seg" data-id="${s.id}" data-f="b" aria-label="Jam selesai">${opsiJam(s.b,TMAX)}</select></span>
-      <span class="hasil">${hasilBlok(x,h.dobel)}</span>
-      ${x.lem>0&&!(h.dobel&&r.ganti)?`<label class="tarif">Tarif lembur/jam <input type="number" min="0" step="500" inputmode="numeric" id="s${s.id}t" data-k="seg" data-id="${s.id}" data-f="tarif" placeholder="${w.lembur}" value="${s.tarif!=null?s.tarif:''}"></label>`:''}
+      ${(()=>{const L=atrUntuk(w,s.tgl,s.at);return L.length?`<select id="s${s.id}at" class="atr-sel" data-k="seg" data-id="${s.id}" data-f="at" aria-label="Aturan blok"><option value="0">Aturan utama</option>${L.map(a=>`<option value="${a.id}"${a.id===s.at?' selected':''}>${esc(a.nama)}</option>`).join('')}</select>`:''})()}
+      <span class="hasil">${hasilBlok(x,x.dobelG!==undefined?x.dobelG:h.dobel)}</span>
+      ${x.lem>0&&!((x.dobelG!==undefined?x.dobelG:h.dobel)&&((x.ctx&&x.ctx.r)||r).ganti)?`<label class="tarif">Tarif lembur/jam <input type="number" min="0" step="500" inputmode="numeric" id="s${s.id}t" data-k="seg" data-id="${s.id}" data-f="tarif" placeholder="${x.ctx?x.ctx.lembur:w.lembur}" value="${s.tarif!=null?s.tarif:''}"></label>`:''}
       <button class="x" data-act="del-seg" data-id="${s.id}" aria-label="Hapus blok">×</button>
     </div>`}).join('');
   const hadir=h.rows.some(x=>!x.err);
@@ -626,6 +661,7 @@ function vAbsensi(){
     <span class="small muted">Isi cepat:</span>
     <select id="bk-p" data-k="bulk" data-f="pid" aria-label="Proyek isi cepat">${opsiProyek(UI.bulk.pid)}</select>
     <span class="row"><select id="bk-a" data-k="bulk" data-f="a" aria-label="Mulai">${opsiJam(UI.bulk.a,TMAX)}</select><span class="muted">–</span><select id="bk-b" data-k="bulk" data-f="b" aria-label="Selesai">${opsiJam(UI.bulk.b,TMAX)}</select></span>
+    ${(()=>{const L=(S.atr||[]).filter(a=>a.berlaku<=t);if(!L.length)return '';if(UI.bulk.at&&!L.some(a=>a.id===UI.bulk.at))UI.bulk.at=0;return `<select id="bk-at" data-k="bulk" data-f="at" aria-label="Aturan isi cepat"><option value="0">Aturan utama</option>${L.map(a=>`<option value="${a.id}"${a.id===UI.bulk.at?' selected':''}>${esc(a.nama)} · ${esc(milikNama(a.milik))}</option>`).join('')}</select>`})()}
     <button class="btn pri" data-act="bulk">Tambahkan ke ${ws.filter(w=>UI.pilih.has(w.id)).length} pekerja terpilih</button>
     <button class="btn" data-act="salin-kemarin">Salin dari hari sebelumnya</button>
   </div>
@@ -926,14 +962,27 @@ function chipsPek(semua){
     <input type="search" id="cari-w" value="${esc(UI.cariW||'')}" placeholder="Cari nama pekerja…" aria-label="Cari nama pekerja" style="margin-left:auto;min-width:200px">
   </div>`;
 }
+// riwayat grup: tampil kalau pekerja pernah pindah grup; tanggal pindah bisa disesuaikan
+function riwayatTxt(w){
+  const R=w.riwayat;if(!R||R.length<2)return '';
+  const nm=e=>e.grup&&GR(e.grup)?GR(e.grup).nama:TIPE[e.tipe],last=R[R.length-1],prev=R[R.length-2];
+  return `<div class="edited" style="display:block;max-width:220px">Sebelumnya ${esc(nm(prev))}. Grup ini berlaku mulai <input type="date" id="w${w.id}rw" data-k="wr" data-id="${w.id}" value="${last.dari}" min="${addD(prev.dari==='0000-00-00'?'2000-01-01':prev.dari,1)}" aria-label="Tanggal mulai grup baru" style="padding:2px 4px;font-size:12px"></div>`;
+}
+// upah per aturan khusus: aturan milik grup pekerja ini + aturan yang sudah dipakai di blok pekerja ini
+function upahAtrSel(w){
+  const k=w.grup&&GR(w.grup)?'grp:'+w.grup:w.tipe,L=(S.atr||[]).filter(a=>a.milik===k||S.segs.some(s=>s.wid===w.id&&s.at===a.id));
+  if(!L.length)return '<span class="muted">–</span>';
+  return L.map(a=>{const u=(w.upahA||{})[a.id]||{};return `<div class="ua"><span class="small"><b>${esc(a.nama)}</b></span><span class="row"><input type="number" id="w${w.id}ua${a.id}u" min="0" step="5000" inputmode="numeric" data-k="ua" data-id="${w.id}" data-r="${a.id}" data-f="upah" value="${u.upah||''}" placeholder="Upah/hari" aria-label="Upah ${esc(a.nama)}" style="width:110px"><input type="number" id="w${w.id}ua${a.id}l" min="0" step="500" inputmode="numeric" data-k="ua" data-id="${w.id}" data-r="${a.id}" data-f="lembur" value="${u.lembur||''}" placeholder="Lembur/jam" aria-label="Lembur ${esc(a.nama)}" style="width:100px"></span></div>`}).join('');
+}
 function vPekerja(){
+  const adaAtr=(S.atr||[]).length>0;
   const semuaW=S.workers.filter(w=>!w.hapus),wsG=semuaW.filter(w=>!UI.fPek||!UI.fPek.size||UI.fPek.has(kunciGrup(w)));
   const rows=wsG.map(w=>`<tr data-nama="${esc(w.nama.toLowerCase())}"${cariCocok(w)?'':' hidden'}>
     <td><input type="text" id="w${w.id}n" data-k="w" data-id="${w.id}" data-f="nama" value="${esc(w.nama)}" aria-label="Nama" style="width:150px">${ed('w|'+w.id)}</td>
-    <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="grup" aria-label="Grup">${opsiGrup(w.grup?'grp:'+w.grup:w.tipe,true)}</select></td>
+    <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="grup" aria-label="Grup">${opsiGrup(w.grup?'grp:'+w.grup:w.tipe,true)}</select>${riwayatTxt(w)}</td>
     <td><input type="number" id="w${w.id}u" min="0" step="5000" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="upah" value="${w.upah}" aria-label="Upah harian"></td>
     <td class="num">${w.tipe==='event'?'<span class="muted">–</span>':`${rp(w.upah/divOf(w.tipe))}<span class="edited" style="display:block">upah harian ÷ ${divOf(w.tipe)}</span>`}</td>
-    <td><input type="number" id="w${w.id}l" min="0" step="500" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="lembur" value="${w.lembur}"${w.tipe==='event'?' disabled':''} aria-label="Tarif lembur per jam"></td>
+    <td><input type="number" id="w${w.id}l" min="0" step="500" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="lembur" value="${w.lembur}"${w.tipe==='event'?' disabled':''} aria-label="Tarif lembur per jam"></td>${adaAtr?`<td>${upahAtrSel(w)}</td>`:''}
     <td><label class="row small"><input type="checkbox" id="w${w.id}a" data-k="w" data-id="${w.id}" data-f="aktif"${w.aktif?' checked':''}> Aktif</label></td>
     <td><button class="x" data-act="del-w" data-id="${w.id}" aria-label="Hapus pekerja">×</button></td>
     <td><input type="tel" id="w${w.id}wa" data-k="w" data-id="${w.id}" data-f="wa" value="${esc(tampilWA(w.wa))}" placeholder="08…" inputmode="tel" style="width:140px" aria-label="No. WA"></td></tr>`).join('');
@@ -941,7 +990,7 @@ function vPekerja(){
   <section class="panel">
     ${chipsPek(semuaW)}
     <p class="small muted" id="cari-info" style="margin:0 0 8px">Menampilkan <b id="cari-n">${wsG.filter(cariCocok).length}</b> dari ${semuaW.length} pekerja</p>
-    <div class="tbl"><table class="tbl-pekerja"><thead><tr><th>Nama</th><th>Grup</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th><th>Status</th><th></th><th>No. WA</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="tbl"><table class="tbl-pekerja"><thead><tr><th>Nama</th><th>Grup</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th>${adaAtr?'<th>Upah aturan khusus</th>':''}<th>Status</th><th></th><th>No. WA</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="small muted">Upah dan tarif lembur diisi manual per orang. Semua hitungan di tab lain mengikuti otomatis.</p>
     ${(()=>{const D=S.workers.filter(w=>w.hapus);return D.length?`<details class="small"><summary class="muted" style="cursor:pointer">Pekerja yang dihapus (${D.length}) · data absensi & gaji lamanya tetap tersimpan</summary><div class="kartu" style="margin-top:8px">${D.map(w=>`<div class="blok"><b>${esc(w.nama)}</b><span class="pill ${PC[w.tipe]}">${esc(grupNama(w))}</span><span class="muted grow">dihapus${w.hapusTgl?' '+tglPendek(w.hapusTgl):''}</span>${ed('w|'+w.id)}<button class="btn small" data-act="pulih-w" data-id="${w.id}">Pulihkan</button></div>`).join('')}</div></details>`:''})()}
   </section>
@@ -979,8 +1028,28 @@ function vAturan(){
     ${r.dobel?`<div class="field"><span>Saat kena 2×, jam lembur malam itu</span><select id="r${tp}g" ${d} data-f="ganti" aria-label="Cara hitung 2×"><option value="1"${r.ganti?' selected':''}>diganti 1 hari upah (total 2 hari)</option><option value="0"${r.ganti?'':' selected'}>tetap dibayar + 1 hari upah</option></select></div>`:''}
     ${ed('r|'+tp)}
   </section>`};
+  const pemilik=[...Object.keys(TIPE).filter(k=>S.rules[k].mode!=='argo'),...(S.grup||[]).filter(g=>S.rules[g.aturan]&&S.rules[g.aturan].mode!=='argo').map(g=>'grp:'+g.id)];
+  const cardC=a=>{const d=`data-k="rc" data-id="${a.id}"`,id='rc'+a.id,dipakai=S.segs.filter(s=>s.at===a.id),awal=dipakai.reduce((m,s)=>!m||s.tgl<m?s.tgl:m,''),orang=S.workers.filter(w=>!w.hapus&&(w.grup&&GR(w.grup)?'grp:'+w.grup:w.tipe)===a.milik),kosongU=orang.filter(w=>!((w.upahA||{})[a.id]&&w.upahA[a.id].upah>0));return `<section class="panel">
+    <h3 class="row"><span class="pill ${PC[a.milik.startsWith('grp:')?((GR(+a.milik.slice(4))||{}).aturan||'workshop'):a.milik]}">${esc(milikNama(a.milik))}</span><input type="text" id="${id}n" ${d} data-f="nama" value="${esc(a.nama)}" aria-label="Nama aturan" class="grow"></h3>
+    <div class="field"><span>Berlaku mulai</span><input type="date" id="${id}bl" ${d} data-f="berlaku" value="${a.berlaku}" aria-label="Berlaku mulai"></div>
+    <div class="field"><span>Jam kerja normal</span><span class="row"><select id="${id}m" ${d} data-f="mulai" aria-label="Mulai">${opsiJam(a.mulai,TMAX)}</select>–<select id="${id}s" ${d} data-f="selesai" aria-label="Selesai">${opsiJam(a.selesai,TMAX)}</select></span></div>
+    <div class="field"><span>Upah normal per jam</span><span class="row">upah harian ÷ <input type="number" min="1" step="1" inputmode="numeric" id="${id}dv" ${d} data-f="div" value="${a.div}" style="width:72px" aria-label="Pembagi upah per jam"></span></div>
+    ${a.ist.map((x,i)=>`<div class="field"><span>Istirahat ${i+1}</span><span class="row"><select id="${id}i${i}a" ${d} data-f="ist" data-i="${i}" data-j="0" aria-label="Mulai istirahat">${opsiJam(x[0],TMAX)}</select>–<select id="${id}i${i}b" ${d} data-f="ist" data-i="${i}" data-j="1" aria-label="Selesai istirahat">${opsiJam(x[1],TMAX)}</select></span></div>`).join('')}
+    <div class="field"><label class="row" for="${id}d"><input type="checkbox" id="${id}d" ${d} data-f="dobel"${a.dobel?' checked':''}> Upah jadi 2× bila masuk di jam normal dan keluar jam</label><select id="${id}j" ${d} data-f="dobelJam" aria-label="Jam batas 2×">${opsiJam(a.dobelJam,TMAX)}</select></div>
+    ${a.dobel?`<div class="field"><span>Saat kena 2×, jam lembur malam itu</span><select id="${id}g" ${d} data-f="ganti" aria-label="Cara hitung 2×"><option value="1"${a.ganti?' selected':''}>diganti 1 hari upah (total 2 hari)</option><option value="0"${a.ganti?'':' selected'}>tetap dibayar + 1 hari upah</option></select></div>`:''}
+    <p class="small muted" style="margin:0">Upah per orang diisi di tab Pekerja.${kosongU.length?` <b>${kosongU.length} dari ${orang.length} orang</b> di grup ini belum diisi upahnya untuk aturan ini.`:''}</p>
+    <p class="small muted" style="margin:0">${dipakai.length?`Dipakai di ${dipakai.length} blok sejak ${tglPendek(awal)}. Mengubah aturan ini ikut mengubah hitungan blok-blok itu. Kalau aturannya berubah mulai tanggal tertentu, pakai <b>Salin jadi aturan baru</b>.`:'Belum dipakai di absensi.'}</p>
+    <div class="row"><button class="btn" data-act="atr-salin" data-id="${a.id}">Salin jadi aturan baru</button>${dipakai.length?'':`<button class="btn" data-act="atr-del" data-id="${a.id}">Hapus aturan</button>`}${ed('atr|'+a.id)}</div>
+  </section>`};
+  const khusus=`<section class="panel kartu"><h3>Aturan khusus per grup</h3>
+    <p class="small muted" style="margin:0">Untuk shift atau proyek yang aturannya beda (misal shift malam). Di Absensi, tiap blok kerja bisa dipilih memakai aturan utama atau aturan khusus grupnya. Blok yang sudah ada tetap memakai aturan utama.</p>
+    <div class="row"><select id="atr-m" aria-label="Grup pemilik aturan">${pemilik.map(k=>`<option value="${k}"${fv('atr-m')===k?' selected':''}>${esc(milikNama(k))}</option>`).join('')}</select><input type="text" id="atr-n" value="${esc(fv('atr-n'))}" class="grow" placeholder="Nama aturan, misal Shift Malam" aria-label="Nama aturan khusus"><button class="btn pri" data-act="atr-add">+ Buat aturan khusus</button></div>
+    <p class="small muted" style="margin:0">Isinya disalin dari aturan utama grup itu dan berlaku mulai hari ini. Setelah dibuat, ubah jam dan istirahatnya di kartunya.</p>
+  </section>`;
   return `<div><div class="label">Pengaturan</div><h2 style="font-size:24px">Aturan jam dan lembur</h2></div>
   <div class="rules">${card('workshop')}${card('garut')}${card('event')}</div>
+  ${khusus}
+  ${(S.atr||[]).length?`<div class="rules">${S.atr.map(cardC).join('')}</div>`:''}
   <section class="panel explain">
     <h3>Cara aplikasi menghitung</h3>
     <ul>
@@ -992,6 +1061,8 @@ function vAturan(){
       <li>Tarif lembur bisa diganti khusus untuk satu blok lewat kolom tarif yang muncul di blok lembur.</li>
       <li>Tim Garut memakai jam normal sendiri (07:00–17:00), setelah itu lembur dengan potongan istirahat 18:00–19:00.</li>
       <li>Event: upah dihitung per argo 24 jam sejak jam berangkat, masuk ke proyek yang dipilih dan dicatat di tanggal berangkat.</li>
+      <li>Aturan khusus per grup (misal shift malam) dipilih per blok kerja di Absensi. Blok dengan aturan khusus dihitung terpisah memakai jam normal, istirahat, lembur, dan upah orang itu untuk aturan tersebut, lalu dijumlah dengan blok aturan utama di hari yang sama.</li>
+      <li>Kalau pekerja pindah grup, absensi sebelum tanggal pindah tetap dihitung dengan grup lamanya.</li>
       <li>Kasbon selalu memotong upah pekerja. Kalau kasbon diberi proyek, nilai proyek itu ikut berkurang di periode yang memuat tanggal kasbonnya.</li>
       <li>Tim Garut dapat 2× upah harian bila masuk 07:00 dan keluar 23:00. Kalau masuknya mundur, jam keluarnya wajib mundur sama banyak (masuk 08:00 berarti keluar 24:00). Kalau syarat itu tidak terpenuhi, lemburnya dihitung per jam biasa. Jam kerja setelah syarat terpenuhi dibayar lembur per jam, di atas 2× upah.</li>
     </ul>
@@ -1213,9 +1284,19 @@ function render(){
 }
 function ubah(){simpan();render()}
 const nid=()=>S.nid++;
+// catat pindah grup supaya absensi sebelum hari ini tetap dihitung dengan grup lama
+function catatPindah(w,lama){
+  const baru={grup:w.grup||null,tipe:w.tipe};if((lama.grup||null)===baru.grup&&lama.tipe===baru.tipe)return;
+  if(!(w.riwayat&&w.riwayat.length)&&!S.segs.some(s=>s.wid===w.id&&s.tgl<HARI_INI))return;
+  const R=w.riwayat&&w.riwayat.length?w.riwayat:[{dari:'0000-00-00',grup:lama.grup||null,tipe:lama.tipe}];
+  const F=R.filter(e=>e.dari<HARI_INI),z=F[F.length-1];
+  if(z&&(z.grup||null)===baru.grup&&z.tipe===baru.tipe){if(F.length>1)w.riwayat=F;else delete w.riwayat;return}
+  w.riwayat=F.concat([{dari:HARI_INI,...baru}]);
+  toast(`${w.nama} pindah grup mulai hari ini. Absensi sebelumnya tetap dihitung dengan grup lama.`);
+}
 
 function blokBaru(w,tgl){
-  const r=S.rules[w.tipe],mine=S.segs.filter(s=>s.tgl===tgl&&s.wid===w.id&&s.b>s.a);
+  const r=ctxDasar(w,tgl).r,mine=S.segs.filter(s=>s.tgl===tgl&&s.wid===w.id&&s.b>s.a);
   const pid=mine.length?mine[mine.length-1].pid:(S.projects.find(p=>p.aktif)||{}).id;
   if(!pid){toast('Tambahkan proyek dulu di tab Proyek');return null}
   if(r.mode==='argo'){
@@ -1248,6 +1329,17 @@ document.addEventListener('click',e=>{
     case 'fprj':{const v=t.dataset.v;UI.fPrj=UI.fPrj||{};const s=UI.fPrj[id]=UI.fPrj[id]||new Set();if(!v)s.clear();else s.has(v)?s.delete(v):s.add(v);render();return}
     case 'fpabs':{const v=t.dataset.v;UI.fpAbs=UI.fpAbs||new Set();if(!v)UI.fpAbs.clear();else{const n=+v;UI.fpAbs.has(n)?UI.fpAbs.delete(n):UI.fpAbs.add(n)}render();return}
     case 'fpek':{const v=t.dataset.v;UI.fPek=UI.fPek||new Set();if(!v)UI.fPek.clear();else UI.fPek.has(v)?UI.fPek.delete(v):UI.fPek.add(v);render();return}
+    case 'atr-add':{
+      const m=document.getElementById('atr-m').value,n=document.getElementById('atr-n').value.trim();
+      if(!n){toast('Isi nama aturan dulu, misal Shift Malam');return}
+      const base=m.startsWith('grp:')?(GR(+m.slice(4))||{}).aturan:m,r=S.rules[base];if(!r||r.mode==='argo'){toast('Grup ini tidak bisa diberi aturan khusus');return}
+      const aid=nid();S.atr=S.atr||[];S.atr.push({id:aid,milik:m,nama:n,berlaku:HARI_INI,mulai:r.mulai,selesai:r.selesai,ist:r.ist.map(x=>[...x]),dobel:!!r.dobel,dobelJam:r.dobelJam,ganti:r.ganti!==false,div:divOf(base)});
+      stamp('atr|'+aid,'Membuat aturan khusus '+n);fclear('atr-n');toast(`Aturan ${n} dibuat. Isi upah per orangnya di tab Pekerja.`);break}
+    case 'atr-salin':{const a=ATR(id);if(!a)return;const aid=nid();S.atr.push({...a,id:aid,nama:a.nama+' (baru)',berlaku:HARI_INI,ist:a.ist.map(x=>[...x])});
+      for(const w of S.workers)if(w.upahA&&w.upahA[id])w.upahA[aid]={...w.upahA[id]};
+      stamp('atr|'+aid,'Menyalin aturan khusus '+a.nama);toast('Aturan disalin, upah per orang ikut disalin. Ubah isinya lalu pakai di blok mulai tanggal berlakunya.');break}
+    case 'atr-del':{const a=ATR(id);if(!a)return;if(S.segs.some(s=>s.at===id)){toast('Aturan ini sudah dipakai di absensi, tidak bisa dihapus');return}
+      catat('Menghapus aturan khusus '+a.nama);S.atr=S.atr.filter(x=>x.id!==id);for(const w of S.workers)if(w.upahA&&w.upahA[id])delete w.upahA[id];break}
     case 'fabs':{const v=t.dataset.v;UI.fAbs=UI.fAbs||new Set();if(!v)UI.fAbs.clear();else UI.fAbs.has(v)?UI.fAbs.delete(v):UI.fAbs.add(v);render();return}
     case 'fgaji':{const v=t.dataset.v;UI.fGaji=UI.fGaji||new Set();if(!v)UI.fGaji.clear();else UI.fGaji.has(v)?UI.fGaji.delete(v):UI.fGaji.add(v);render();return}
     case 'pdf-p':unduhProyek([id]);return;
@@ -1260,20 +1352,21 @@ document.addEventListener('click',e=>{
     case 'buka-p':UI.bukaP.has(id)?UI.bukaP.delete(id):UI.bukaP.add(id);render();return;
     case 'add-seg':{const s=blokBaru(W(id),UI.tgl);if(s){S.segs.push(s);abs(id,UI.tgl)}break}
     case 'normal':{const w=W(id),pid=(S.projects.find(p=>p.aktif)||{}).id;if(!pid){toast('Tambahkan proyek dulu di tab Proyek');return}
-      for(const [a,b] of sesi(S.rules[w.tipe]))S.segs.push({id:nid(),tgl:UI.tgl,wid:id,pid,a,b,tarif:null});abs(id,UI.tgl);break}
+      for(const [a,b] of sesi(ctxDasar(w,UI.tgl).r))S.segs.push({id:nid(),tgl:UI.tgl,wid:id,pid,a,b,tarif:null});abs(id,UI.tgl);break}
     case 'del-seg':{const s=S.segs.find(s=>s.id===id);if(s)abs(s.wid,s.tgl);S.segs=S.segs.filter(s=>s.id!==id);break}
     case 'bulk':{
       const tampil=new Set(wsAbsen().map(w=>w.id)),target=[...UI.pilih].filter(id=>tampil.has(id));
       if(!target.length){toast('Centang dulu pekerja yang mau diisi');return}
       if(UI.bulk.b<=UI.bulk.a){toast('Jam selesai harus setelah jam mulai');return}
-      let ok=0,skip=0;
+      let ok=0,skip=0,beda=0;const at=UI.bulk.at&&ATR(UI.bulk.at)?UI.bulk.at:0;
       for(const wid of target){
-        if(S.rules[W(wid).tipe].mode==='argo'){
+        if(at&&(ATR(at).milik!==kunciPada(W(wid),UI.tgl)||ctxDasar(W(wid),UI.tgl).r.mode==='argo')){beda++;continue}
+        if(ctxDasar(W(wid),UI.tgl).r.mode==='argo'){
           if(S.segs.some(s=>s.tgl===UI.tgl&&s.wid===wid)){skip++;continue}
           S.segs.push({id:nid(),tgl:UI.tgl,wid,pid:UI.bulk.pid,a:UI.bulk.a,b:1440,hari:1,tarif:null});abs(wid,UI.tgl);ok++;continue}
         if(S.segs.some(s=>s.tgl===UI.tgl&&s.wid===wid&&ov(s.a,s.b,UI.bulk.a,UI.bulk.b)>0)){skip++;continue}
-        S.segs.push({id:nid(),tgl:UI.tgl,wid,pid:UI.bulk.pid,a:UI.bulk.a,b:UI.bulk.b,tarif:null});abs(wid,UI.tgl);ok++}
-      toast(`${ok} blok ditambahkan${skip?`, ${skip} dilewati karena jamnya bentrok`:''}`);break}
+        const sb={id:nid(),tgl:UI.tgl,wid,pid:UI.bulk.pid,a:UI.bulk.a,b:UI.bulk.b,tarif:null};if(at)sb.at=at;S.segs.push(sb);abs(wid,UI.tgl);ok++}
+      toast(`${ok} blok ditambahkan${skip?`, ${skip} dilewati karena jamnya bentrok`:''}${beda?`, ${beda} dilewati karena aturan itu bukan untuk grupnya`:''}`);break}
     case 'salin-kemarin':{
       const prev=S.segs.filter(s=>s.tgl<UI.tgl).reduce((m,s)=>s.tgl>m?s.tgl:m,'');
       if(!prev){toast('Belum ada absensi di hari sebelumnya');return}
@@ -1378,13 +1471,20 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   const t=e.target,k=t.dataset.k;if(!k)return;
   const id=+t.dataset.id,f=t.dataset.f,v=t.type==='checkbox'?t.checked:t.value;
-  if(k==='seg'){const s=S.segs.find(x=>x.id===id);if(!s)return;abs(s.wid,s.tgl);if(f==='tarif')s.tarif=v===''?null:Math.max(0,+v||0);else if(f==='hari')s.hari=Math.max(1,Math.round(+v)||1);else s[f]=+v}
-  else if(k==='w'){const w=W(id);stamp('w|'+id,'Pekerja '+w.nama);if(f==='nama')w.nama=v.trim()||w.nama;else if(f==='grup')setGrup(w,v);else if(f==='wa')w.wa=normWA(v);else if(f==='tipe'||f==='aktif')w[f]=v;else w[f]=Math.max(0,+v||0)}
+  if(k==='seg'){const s=S.segs.find(x=>x.id===id);if(!s)return;abs(s.wid,s.tgl);if(f==='tarif')s.tarif=v===''?null:Math.max(0,+v||0);else if(f==='at'){if(+v)s.at=+v;else delete s.at}else if(f==='hari')s.hari=Math.max(1,Math.round(+v)||1);else s[f]=+v}
+  else if(k==='w'){const w=W(id);stamp('w|'+id,'Pekerja '+w.nama);if(f==='nama')w.nama=v.trim()||w.nama;else if(f==='grup'){const lama=grupPada(w,HARI_INI);setGrup(w,v);catatPindah(w,lama)}else if(f==='wa')w.wa=normWA(v);else if(f==='tipe'||f==='aktif')w[f]=v;else w[f]=Math.max(0,+v||0)}
   else if(k==='p'){const p=P(id);stamp('p|'+id,'Proyek '+p.nama);if(f==='nama')p.nama=v.trim()||p.nama;else p[f]=v;if(f==='warna'){const sama=S.projects.find(q=>q.id!==id&&jarak(q.warna,v)<40);if(sama)toast(`Warna ini mirip dengan proyek ${sama.nama}. Sebaiknya pilih warna lain.`)}}
   else if(k==='r'){const r=S.rules[t.dataset.tipe];stamp('r|'+t.dataset.tipe,'Aturan '+TIPE[t.dataset.tipe]);
     if(f==='ist')r.ist[+t.dataset.i][+t.dataset.j]=+v;else if(f==='dobel')r.dobel=v;else if(f==='ganti')r.ganti=v==='1';else r[f]=+v;
     if(r.selesai<=r.mulai)toast('Jam selesai normal harus setelah jam mulai')}
-  else if(k==='g'){const g=GR(id);if(!g)return;stamp('g|'+id,'Grup '+g.nama);if(f==='nama')g.nama=v.trim()||g.nama;else{g.aturan=v;for(const w of S.workers)if(w.grup===id)w.tipe=v}}
+  else if(k==='g'){const g=GR(id);if(!g)return;stamp('g|'+id,'Grup '+g.nama);if(f==='nama')g.nama=v.trim()||g.nama;else{g.aturan=v;for(const w of S.workers){if(w.grup===id)w.tipe=v;for(const e of w.riwayat||[])if(e.grup===id)e.tipe=v}}}
+  else if(k==='ua'){const w=W(id);if(!w)return;stamp('w|'+id,'Upah aturan khusus '+w.nama);w.upahA=w.upahA||{};const r=+t.dataset.r,o=w.upahA[r]=w.upahA[r]||{upah:0,lembur:0};o[f]=Math.max(0,+v||0)}
+  else if(k==='wr'){const w=W(id);if(!w||!w.riwayat||w.riwayat.length<2||!v)return;const R=w.riwayat,prev=R[R.length-2];if(v<=prev.dari){toast('Tanggal harus setelah tanggal pindah sebelumnya');render();return}stamp('w|'+id,'Tanggal pindah grup '+w.nama);R[R.length-1].dari=v}
+  else if(k==='rc'){const a=ATR(id);if(!a)return;stamp('atr|'+id,'Aturan khusus '+a.nama);
+    if(f==='nama')a.nama=v.trim()||a.nama;
+    else if(f==='berlaku'){const pakai=S.segs.filter(s=>s.at===id).reduce((m,s)=>!m||s.tgl<m?s.tgl:m,'');if(!v){render();return}if(pakai&&v>pakai){toast(`Sudah ada blok tanggal ${tglPendek(pakai)} yang memakai aturan ini, jadi tanggal berlaku paling lambat ${tglPendek(pakai)}`);render();return}a.berlaku=v}
+    else if(f==='ist')a.ist[+t.dataset.i][+t.dataset.j]=+v;else if(f==='dobel')a.dobel=v;else if(f==='ganti')a.ganti=v==='1';else a[f]=f==='div'?Math.max(1,+v||1):+v;
+    if(a.selesai<=a.mulai)toast('Jam selesai normal harus setelah jam mulai')}
   else if(k==='alm'){render();return}
   else if(k==='am'){const m=AM(id);if(!m)return;stamp('am|'+id,'Master alat '+m.nama);if(f==='nama')m.nama=v.trim()||m.nama;else m[f]=v}
   else if(k==='kas'){const x=S.kasbon.find(q=>q.id===id);if(!x)return;x.pid=+v||null;stamp('k|'+id,'Kasbon '+((W(x.wid)||{}).nama||''))}
