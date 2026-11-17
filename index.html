@@ -78,7 +78,7 @@ main{max-width:1080px;margin:0 auto;padding-block:18px 60px;padding-inline:16px;
 .btn.soft{background:var(--brand-soft);border-color:var(--brand-soft);color:var(--brand)}
 .btn.bad{background:var(--bad);border-color:var(--bad);color:var(--brand-ink)}
 .btn.sq{padding:8px 11px}
-input[type=text],input[type=password],input[type=number],input[type=date],select{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 9px;min-width:0;max-width:100%}
+input[type=text],input[type=search],input[type=password],input[type=number],input[type=date],select{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 9px;min-width:0;max-width:100%}
 input[type=number]{width:120px}
 input[type=color]{width:38px;height:36px;padding:2px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
 input[type=checkbox]{width:18px;height:18px;accent-color:var(--brand)}
@@ -913,8 +913,22 @@ function vProyek(){
 }
 
 /* ---------- PEKERJA ---------- */
+// filter tampilan Pekerja per grup + cari nama (hanya tampilan, data tidak berubah)
+const cariCocok=w=>{const q=(UI.cariW||'').trim().toLowerCase();return !q||w.nama.toLowerCase().includes(q)};
+function chipsPek(semua){
+  const n={};for(const w of semua){const k=kunciGrup(w);n[k]=(n[k]||0)+1}
+  const nm=k=>k.startsWith('grp:')?((GR(+k.slice(4))||{}).nama||'?'):TIPE[k];
+  const keys=Object.keys(n).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const on=UI.fPek&&UI.fPek.size;
+  return `<div class="chips" role="group" aria-label="Filter grup pekerja"><span class="small muted">Grup:</span>
+    <button class="chip" data-act="fpek" data-v="" aria-pressed="${!on}">Semua <span class="n">${semua.length}</span></button>
+    ${keys.map(k=>`<button class="chip" data-act="fpek" data-v="${k}" aria-pressed="${!!(on&&UI.fPek.has(k))}">${esc(nm(k))} <span class="n">${n[k]}</span></button>`).join('')}
+    <input type="search" id="cari-w" value="${esc(UI.cariW||'')}" placeholder="Cari nama pekerja…" aria-label="Cari nama pekerja" style="margin-left:auto;min-width:200px">
+  </div>`;
+}
 function vPekerja(){
-  const rows=S.workers.filter(w=>!w.hapus).map(w=>`<tr>
+  const semuaW=S.workers.filter(w=>!w.hapus),wsG=semuaW.filter(w=>!UI.fPek||!UI.fPek.size||UI.fPek.has(kunciGrup(w)));
+  const rows=wsG.map(w=>`<tr data-nama="${esc(w.nama.toLowerCase())}"${cariCocok(w)?'':' hidden'}>
     <td><input type="text" id="w${w.id}n" data-k="w" data-id="${w.id}" data-f="nama" value="${esc(w.nama)}" aria-label="Nama" style="width:150px">${ed('w|'+w.id)}</td>
     <td><select id="w${w.id}t" data-k="w" data-id="${w.id}" data-f="grup" aria-label="Grup">${opsiGrup(w.grup?'grp:'+w.grup:w.tipe,true)}</select></td>
     <td><input type="number" id="w${w.id}u" min="0" step="5000" inputmode="numeric" data-k="w" data-id="${w.id}" data-f="upah" value="${w.upah}" aria-label="Upah harian"></td>
@@ -925,6 +939,8 @@ function vPekerja(){
     <td><input type="tel" id="w${w.id}wa" data-k="w" data-id="${w.id}" data-f="wa" value="${esc(tampilWA(w.wa))}" placeholder="08…" inputmode="tel" style="width:140px" aria-label="No. WA"></td></tr>`).join('');
   return `<div><div class="label">Master data</div><h2 style="font-size:24px">Pekerja</h2></div>
   <section class="panel">
+    ${chipsPek(semuaW)}
+    <p class="small muted" id="cari-info" style="margin:0 0 8px">Menampilkan <b id="cari-n">${wsG.filter(cariCocok).length}</b> dari ${semuaW.length} pekerja</p>
     <div class="tbl"><table class="tbl-pekerja"><thead><tr><th>Nama</th><th>Grup</th><th>Upah harian / per argo (Rp)</th><th>Upah normal per jam</th><th>Lembur per jam (Rp)</th><th>Status</th><th></th><th>No. WA</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="small muted">Upah dan tarif lembur diisi manual per orang. Semua hitungan di tab lain mengikuti otomatis.</p>
     ${(()=>{const D=S.workers.filter(w=>w.hapus);return D.length?`<details class="small"><summary class="muted" style="cursor:pointer">Pekerja yang dihapus (${D.length}) · data absensi & gaji lamanya tetap tersimpan</summary><div class="kartu" style="margin-top:8px">${D.map(w=>`<div class="blok"><b>${esc(w.nama)}</b><span class="pill ${PC[w.tipe]}">${esc(grupNama(w))}</span><span class="muted grow">dihapus${w.hapusTgl?' '+tglPendek(w.hapusTgl):''}</span>${ed('w|'+w.id)}<button class="btn small" data-act="pulih-w" data-id="${w.id}">Pulihkan</button></div>`).join('')}</div></details>`:''})()}
@@ -1216,6 +1232,12 @@ function blokBaru(w,tgl){
   return {id:nid(),tgl,wid:w.id,pid,a,b,tarif:null};
 }
 
+document.addEventListener('input',e=>{
+  if(e.target.id!=='cari-w')return;
+  UI.cariW=e.target.value;const q=UI.cariW.trim().toLowerCase();let n=0;
+  document.querySelectorAll('.tbl-pekerja tbody tr').forEach(tr=>{const ok=!q||tr.dataset.nama.includes(q);tr.hidden=!ok;if(ok)n++});
+  const c=document.getElementById('cari-n');if(c)c.textContent=n;
+});
 document.addEventListener('click',e=>{
   if(e.target.closest('input,select,textarea'))return;
   const t=e.target.closest('[data-act]');if(!t)return;
@@ -1225,6 +1247,7 @@ document.addEventListener('click',e=>{
     case 'pdf-pilih':{const vis=new Set(gajiTampil().map(o=>o.w.id));unduhPDF([...UI.slip].filter(i=>vis.has(i)));return}return;
     case 'fprj':{const v=t.dataset.v;UI.fPrj=UI.fPrj||{};const s=UI.fPrj[id]=UI.fPrj[id]||new Set();if(!v)s.clear();else s.has(v)?s.delete(v):s.add(v);render();return}
     case 'fpabs':{const v=t.dataset.v;UI.fpAbs=UI.fpAbs||new Set();if(!v)UI.fpAbs.clear();else{const n=+v;UI.fpAbs.has(n)?UI.fpAbs.delete(n):UI.fpAbs.add(n)}render();return}
+    case 'fpek':{const v=t.dataset.v;UI.fPek=UI.fPek||new Set();if(!v)UI.fPek.clear();else UI.fPek.has(v)?UI.fPek.delete(v):UI.fPek.add(v);render();return}
     case 'fabs':{const v=t.dataset.v;UI.fAbs=UI.fAbs||new Set();if(!v)UI.fAbs.clear();else UI.fAbs.has(v)?UI.fAbs.delete(v):UI.fAbs.add(v);render();return}
     case 'fgaji':{const v=t.dataset.v;UI.fGaji=UI.fGaji||new Set();if(!v)UI.fGaji.clear();else UI.fGaji.has(v)?UI.fGaji.delete(v):UI.fGaji.add(v);render();return}
     case 'pdf-p':unduhProyek([id]);return;
